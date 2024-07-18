@@ -1,0 +1,126 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        //classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.4'
+    }
+}
+
+repositories {
+    //maven { url = 'https://repo.spongepowered.org/maven' }
+
+    maven {
+        url "https://cursemaven.com"
+    }
+
+    maven {
+        url 'https://maven.dynamx.fr/artifactory/ACsLibRepo'
+    }
+
+    flatDir {
+        dir 'libs'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+//apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'idea'
+
+version = version_major + "." + version_minor + "." + version_patch
+group = "fr.aym.gtwnpc"
+archivesBaseName = "GtwNpc"
+
+compileJava.options.encoding = 'UTF-8'
+
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8'
+
+minecraft {
+    mappings channel: 'stable', version: '39-1.12'
+
+    //accessTransformer = file('src/main/resources/META-INF/gtwnpc_at.cfg')
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'info'
+        }
+        server {
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'info'
+        }
+    }
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
+    implementation ("net.minecraftforge:mergetool:0.2.3.3") { force = true }
+
+    //implementation "fr.aym:ACsLib:1.2.12"
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+    implementation ":ACsGuis:1.2.13-all"
+
+    implementation 'org.joml:joml:1.10.5'
+
+    //shadow fileTree(dir: 'libs', include: '*.jar')
+    //c dans DynamX donc c bon shadow "fr.aym:ACsLib:1.2.12"
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+}
+
+jar {
+    duplicatesStrategy 'exclude'
+    /*manifest {
+        attributes "FMLCorePlugin": "fr.aym.gtwnpc.core.GtwNpcCoreMod"
+        attributes "FMLAT": "gtwnpc_at.cfg"
+        attributes "FMLCorePluginContainsFMLMod": "true"
+        attributes "ForceLoadAsMod": "true"
+    }*/
+}
+
+/*shadowJar {
+    duplicatesStrategy 'exclude'
+    configurations = [project.configurations.shadow]
+    classifier = 'all'
+}
+
+reobf {
+    shadowJar {
+    }
+}*/
+
+jar.finalizedBy('reobfJar')
+
+/** Things that idea needs to process resources ? **/
+idea {
+    module {
+        inheritOutputDirs = true
+    }
+}
+subprojects {
+    apply plugin: 'idea'
+}
+task prepareAssets(type: Copy) {
+    group = 'build'
+    from project.file('src/main/resources')
+    into project.file('build/classes/java/main')
+}
+
+classes.dependsOn(prepareAssets)
+/** end of things **/
+
+//tasks.reobfShadowJar.mustRunAfter shadowJar
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    from(sourceSets.main.allSource) {
+        include 'fr/**/**'
+    }
+    classifier = 'sources'
+}
+
+build {
+    //dependsOn reobfShadowJar
+    dependsOn sourcesJar
+}
