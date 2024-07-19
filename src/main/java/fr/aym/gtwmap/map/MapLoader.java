@@ -200,7 +200,7 @@ public class MapLoader {
                         try {
                             mapFile.createNewFile();
                             FileWriterWithEncoding wri = new FileWriterWithEncoding(mapFile, "UTF-8");
-                            wri.write(VERSION + ";" + part.getWidth() + ";" + part.getHeigth() + System.getProperty("line.separator"));
+                            wri.write(VERSION + ";" + part.getWidth() + ";" + part.getLength() + System.getProperty("line.separator"));
                             for (int i = 0; i < part.getMapTextureData().length - 1; i++) {
                                 wri.write(part.getMapTextureData()[i] + ";");
                             }
@@ -265,8 +265,8 @@ public class MapLoader {
                         for (int x = 0; x < part.getWidth(); x++) {
                             if (exitLoops)
                                 break;
-                            for (int z = 0; z < part.getHeigth(); z++) {
-                                int put = z * part.getHeigth() + x;
+                            for (int z = 0; z < part.getLength(); z++) {
+                                int put = z * part.getLength() + x;
                                 if (part.getMapTextureData()[put] == Color.lightGray.getRGB()) {
                                     BlockPos pos = new BlockPos(x + part.getPos().getInWorldX(), 0, z + part.getPos().getInWorldZ());
                                     //pos = world.getTopSolidOrLiquidBlock(pos);
@@ -308,7 +308,7 @@ public class MapLoader {
                                             System.out.println("Render in progress... " + percent + "%");
                                             if (listener != null)
                                                 listener.sendMessage(new TextComponentString("Render in progress... " + percent + "%"));
-                                            percent = 100 * put / (part.getWidth() * part.getHeigth());
+                                            percent = 100 * put / (part.getWidth() * part.getLength());
                                             System.out.println("Tile percent... " + percent + "%");
                                             if (listener != null)
                                                 listener.sendMessage(new TextComponentString("Tile percent... " + percent + "%"));

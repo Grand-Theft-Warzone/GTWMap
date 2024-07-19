@@ -2,6 +2,7 @@ package fr.aym.gtwmap.map;
 
 import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
+import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -14,24 +15,29 @@ import java.awt.*;
 import java.util.function.Function;
 
 public class MapPart {
+    @Getter
     private final PartPos pos;
-    private final int width, heigth;
+    @Getter
+    private final int width;
+    @Getter
+    private final int length;
+    @Getter
     private final int[] mapTextureData;
     private final Function<PartPos, Void> reloadCallable;
+    @Getter
+    private final World world;
 
-    private boolean dirty = true;
+    private State dirty = State.NOT_SET;
 
-    private World world;
-
-    public MapPart(World world, PartPos pos, int width, int height, @Nullable Function<PartPos, Void> reloadCallable2, @Nullable int[] textureData) {
+    public MapPart(World world, PartPos pos, int width, int length, @Nullable Function<PartPos, Void> reloadCallable2, @Nullable int[] textureData) {
         this.world = world;
         this.pos = pos;
         this.width = width;
-        this.heigth = height;
+        this.length = length;
         if (textureData != null)
             this.mapTextureData = textureData;
         else
-            this.mapTextureData = new int[width * height];
+            this.mapTextureData = new int[width * length];
         for (int i = 0; i < this.mapTextureData.length; ++i) {
             this.mapTextureData[i] = Color.lightGray.getRGB();
         }
@@ -100,12 +106,12 @@ public class MapPart {
         if (mark != null) {
             int x = mark.getX() - pos.getInWorldX();
             int z = mark.getZ() - pos.getInWorldZ();
-            if ((z * getHeigth() + x) > mapTextureData.length || (z * getHeigth() + x) < 0) {
-                System.out.println("OUTOFBOUND " + x + z + getWidth() + getHeigth() + mapTextureData.length + " " + mark + " " + pos + " " + this + " == " + (z * getHeigth() + x));
+            if ((z * getLength() + x) > mapTextureData.length || (z * getLength() + x) < 0) {
+                System.out.println("OUTOFBOUND " + x + z + getWidth() + getLength() + mapTextureData.length + " " + mark + " " + pos + " " + this + " == " + (z * getLength() + x));
                 this.dirty = true;
                 return this;
             }
-            mapTextureData[z * this.getHeigth() + x] = Color.lightGray.getRGB();
+            mapTextureData[z * this.getLength() + x] = Color.lightGray.getRGB();
         }
         this.dirty = dirty;
         return this;
@@ -115,23 +121,7 @@ public class MapPart {
         return dirty;
     }
 
-    public PartPos getPos() {
-        return pos;
-    }
-
-    public int[] getMapTextureData() {
-        return mapTextureData;
-    }
-
-    public int getWidth() {
-        return width;
-    }
-
-    public int getHeigth() {
-        return heigth;
-    }
-
-    public World getWorld() {
-        return world;
+    public enum State {
+        NOT_SET, LOADING, LOADED, ERRORED, DIRTY
     }
 }
