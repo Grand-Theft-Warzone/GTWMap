@@ -18,6 +18,7 @@ import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapPart;
+import fr.aym.gtwmap.map.MapPartClient;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
@@ -37,6 +38,7 @@ import java.util.List;
 
 public class GuiMapTest extends GuiFrame {
     public static final ResourceLocation STYLE = new ResourceLocation(GtwMapConstants.ID, "css/gui_map.css");
+    public static int loadingTiles;
 
     private final Rectangle defaultViewport;
     private Rectangle viewport;
@@ -51,11 +53,8 @@ public class GuiMapTest extends GuiFrame {
         setNeedsCssReload(true);
 
         BlockPos pos = mc.player.getPosition();
-        this.defaultViewport = new Rectangle(pos.getX() - 200, pos.getZ() - 200, MapContainer.TILE_WIDTH, MapContainer.TILE_HEIGHT);
+        this.defaultViewport = new Rectangle(pos.getX() - 200, pos.getZ() - 200, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE);
         this.viewport = defaultViewport;
-
-        if (MapContainer.getINSTANCE() == null)
-            new MapContainerClient();
 
         final GuiPanel pane = new GuiPanel();
         pane.setCssId("container");
@@ -169,7 +168,7 @@ public class GuiMapTest extends GuiFrame {
             //System.out.println(dWheel + " " + amount);
         });
 
-        add(new GuiLabel(2, 2, getWidth() - 4, 20, "Carte de DrawLife, appuyez sur echap pour sortir. Clic droit pour mettre un marqueur personnalisé."));
+        add(new GuiLabel(2, 2, getWidth() - 4, 20, "Grand Theft Warzone Map. Right-click to set a custom marker.").setCssId("title"));
         updateViewport(viewport);
     }
 
@@ -225,6 +224,8 @@ public class GuiMapTest extends GuiFrame {
 
         //System.out.println("Bases : " + bx + " " + by + " " + dw + " " + dh);
 
+        MapContainerClient mapContainer = (MapContainerClient) MapContainer.getInstance(true);
+
         countx = 0;
         int x = newViewport.x - (ux % 400) - 400;
         //GuiLabel lab;
@@ -232,8 +233,8 @@ public class GuiMapTest extends GuiFrame {
             int z = newViewport.y - (uy % 400) - 400;
             county = 0;
             for (int dy = by - dh; dy < by + mapPane.getHeight() + dh; dy = dy + dh) {
-                MapPart part = MapContainer.getINSTANCE().requestTile(x, z, mc.world, mc.player);
-                part.updateMapContents();
+                MapPartClient part = (MapPartClient) mapContainer.requestTile(x, z, mc.world, mc.player);
+                part.refreshMapContents();
 
                 //if(part.getPos().equals(new PartPos(0, 0)))
                 //System.out.println("For " + x + " " + z + " : " + dw + " " + dh + " " + dx + " " + dy + " " + part.getPos() + " " + ((MapContainerClient) MapContainer.getINSTANCE()).getLocation(part.getPos()));
@@ -241,11 +242,12 @@ public class GuiMapTest extends GuiFrame {
                 int finalDx = dx;
                 int finalDy = dy;
                 mapPane.add(new GuiPanel()/*.add(lab).setBorderSize(0).setBorderColor(Color.RED.getRGB())*/.getStyle()
-                        .setTexture(new GuiTextureSprite(((MapContainerClient) MapContainer.getINSTANCE()).getLocation(part.getPos()), 0, 0, 400, 400) {
+                        //TODO CHANGE WHEN FIXED IN ACSGUIS
+                        .setTexture(new GuiTextureSprite(part.getLocation(), 0, 0, 400, 400) {
                             @Override
                             public void drawSprite(int x, int y, int spriteWidth, int spriteHeight, int uOffset, int vOffset, int textureWidth, int textureHeight, int width, int height) {
                                 //That fdp is loading the texture himself, we don't want that !! (TODO change in ACsGuis)
-                                Minecraft.getMinecraft().renderEngine.bindTexture(((MapContainerClient) MapContainer.getINSTANCE()).getLocation(part.getPos()));
+                                Minecraft.getMinecraft().renderEngine.bindTexture(part.getLocation());
                                 Gui.drawScaledCustomSizeModalRect(x, y,
                                         0 + uOffset, 0 + vOffset,
                                         (int) Math.ceil(textureWidth * 1), (int) Math.ceil(textureHeight * 1),
@@ -385,6 +387,9 @@ public class GuiMapTest extends GuiFrame {
         int x = viewport.x + (mouseX - mapPane.getRenderMinX()) * viewport.width / (mapPane.getWidth() == 0 ? 1 : mapPane.getWidth());
         int z = viewport.y + (mouseY - mapPane.getRenderMinY()) * viewport.height / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight());
         mc.fontRenderer.drawString("x= " + x + " z=" + z, mouseX + 10, mouseY + 10, Color.WHITE.getRGB());
+        if(loadingTiles > 0) {
+            mc.fontRenderer.drawString(loadingTiles + " tiles loading", 2, getHeight() - 21, Color.CYAN.getRGB());
+        }
         mc.fontRenderer.drawString(countx + "*" + county + " (" + (countx * county) + ") tiles displayed", 2, getHeight() - 11, Color.WHITE.getRGB());
     }
 
@@ -392,7 +397,7 @@ public class GuiMapTest extends GuiFrame {
     public void guiClose() {
         super.guiClose();
         GtwMapMod.getNetwork().sendToServer(new S19PacketMapPartQuery(Integer.MIN_VALUE, Integer.MAX_VALUE));
-        ((MapContainerClient) MapContainer.getINSTANCE()).dirtyAll();
+        ((MapContainerClient) MapContainer.getInstance(true)).dirtyAll();
     }
 
     @Override

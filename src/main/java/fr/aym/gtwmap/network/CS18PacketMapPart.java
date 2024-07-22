@@ -1,8 +1,10 @@
 package fr.aym.gtwmap.network;
 
+import fr.aym.gtwmap.client.gui.GuiMapTest;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapPart;
 import fr.aym.gtwmap.map.PartPos;
+import fr.aym.gtwmap.utils.GtwMapConstants;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
@@ -13,14 +15,15 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 public class CS18PacketMapPart implements IMessage {
     private PartPos pos;
     private int[] blockData;
+    private int currentlyLoading;
 
     public CS18PacketMapPart() {
     }
 
-    public CS18PacketMapPart(MapPart part) {
-        //System.out.println("Sending update of "+part);
+    public CS18PacketMapPart(MapPart part, int currentlyLoading) {
         this.pos = part.getPos();
         this.blockData = part.getMapTextureData();
+        this.currentlyLoading = currentlyLoading;
     }
 
     @Override
@@ -28,6 +31,7 @@ public class CS18PacketMapPart implements IMessage {
         PacketBuffer bu = new PacketBuffer(buf);
         pos = new PartPos(bu.readInt(), bu.readInt());
         blockData = bu.readVarIntArray();
+        currentlyLoading = bu.readInt();
     }
 
     @Override
@@ -36,20 +40,18 @@ public class CS18PacketMapPart implements IMessage {
         bu.writeInt(pos.xOrig);
         bu.writeInt(pos.zOrig);
         bu.writeVarIntArray(blockData);
+        bu.writeInt(currentlyLoading);
     }
 
     public static class Handler implements IMessageHandler<CS18PacketMapPart, IMessage> {
         @Override
         public IMessage onMessage(CS18PacketMapPart message, MessageContext ctx) {
             Minecraft.getMinecraft().addScheduledTask(() -> {
-                int x = message.pos.xOrig * 400;
-                int z = message.pos.zOrig * 400;
-                /*if (x < 0)
-                    x += 400;
-                if (z < 0)
-                    z += 400;*/
-                MapContainer.getINSTANCE().requestTile(x, z, Minecraft.getMinecraft().world, null).feedWidthBlockData(message.blockData);
+                int x = message.pos.xOrig * GtwMapConstants.TILE_SIZE;
+                int z = message.pos.zOrig * GtwMapConstants.TILE_SIZE;
+                MapContainer.getInstance(true).requestTile(x, z, Minecraft.getMinecraft().world, null).feedWidthBlockData(message.blockData);
             });
+            GuiMapTest.loadingTiles = message.currentlyLoading;
             return null;
         }
     }

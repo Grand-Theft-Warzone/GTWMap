@@ -41,15 +41,15 @@ public class CommandGtwMap extends CommandBase {
         } else if (args.length >= 1 && args[0].equalsIgnoreCase("loadmap")) {
             if (args.length == 2 && args[1].equalsIgnoreCase("preload")) {
                 sender.sendMessage(new TextComponentString("Chargement de toute la carte, cela prendra un certain temps..."));
-                MapLoader.loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], -1, sender);
+                MapLoader.getInstance().loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], -1, sender);
                 return;
             } else if (args.length == 2 && args[1].equalsIgnoreCase("full")) {
                 sender.sendMessage(new TextComponentString("Rendu de toute la carte, cela prendra un certain temps..."));
-                MapLoader.loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], 1, sender);
+                MapLoader.getInstance().loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], 1, sender);
                 return;
             } else if (args.length == 7 && args[1].equalsIgnoreCase("region")) {
                 sender.sendMessage(new TextComponentString("Rendu de la carte à partir de ces coordonnées, cela prendra un certain temps..."));
-                MapLoader.loadArea(Integer.parseInt(args[2]), Integer.parseInt(args[4]), Integer.parseInt(args[3]), Integer.parseInt(args[5]), Integer.parseInt(args[6]), sender);
+                MapLoader.getInstance().loadArea(Integer.parseInt(args[2]), Integer.parseInt(args[4]), Integer.parseInt(args[3]), Integer.parseInt(args[5]), Integer.parseInt(args[6]), sender);
                 return;
             } else {
                 sender.sendMessage(new TextComponentString("==== RealTimeMap commands : ===="));

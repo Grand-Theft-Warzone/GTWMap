@@ -1,5 +1,6 @@
 package fr.aym.gtwmap.server;
 
+import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapContainerServer;
 import fr.aym.gtwmap.map.MapPart;
@@ -13,28 +14,26 @@ import java.util.function.Function;
 public class ServerEventHandler {
     @SubscribeEvent
     public void playerDisconnectedFromServer(PlayerEvent.PlayerLoggedOutEvent event) {
-        ((MapContainerServer) MapContainer.getINSTANCE()).removeRequester(event.player);
+        ((MapContainerServer) MapContainer.getInstance(false)).removeRequester(event.player);
     }
 
     @SubscribeEvent
     public void tick(TickEvent.WorldTickEvent event) {
         if (event.phase == TickEvent.Phase.END && event.world.getTotalWorldTime() % 5 == 0) {
-            ((MapContainerServer) MapContainer.getINSTANCE()).update();
+            ((MapContainerServer) MapContainer.getInstance(false)).update();
         }
     }
 
     @SubscribeEvent
     public void blockNotif(BlockEvent.NeighborNotifyEvent event) {
-        ((MapContainerServer) MapContainer.getINSTANCE()).requestTileServer(event.getPos().getX(), event.getPos().getZ(), null, new Function<MapPart, Void>() {
-            @Override
-            public Void apply(MapPart t) {
-                t.setDirty(true, event.getPos());
-                return null;
+        //if(true)
+          //  return;
+        ((MapContainerServer) MapContainer.getInstance(false)).requestTileLoading(event.getPos().getX(), event.getPos().getZ(), null).whenComplete((p, e) -> {
+            if(e != null) {
+                GtwMapMod.log.error("Error marking map part as dirty at {}", event.getPos(), e);
             }
-
-            @Override
-            public int hashCode() {
-                return event.getPos().hashCode();
+            if(p != null) {
+                p.setDirty(true, event.getPos());
             }
         });
     }

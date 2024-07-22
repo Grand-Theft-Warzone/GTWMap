@@ -38,9 +38,9 @@ public class S19PacketMapPartQuery implements IMessage {
         public IMessage onMessage(S19PacketMapPartQuery message, MessageContext ctx) {
             ctx.getServerHandler().player.server.addScheduledTask(() -> {
                 if (message.x == Integer.MIN_VALUE && message.z == Integer.MAX_VALUE)
-                    ((MapContainerServer) MapContainer.getINSTANCE()).removeRequester(ctx.getServerHandler().player);
+                    ((MapContainerServer) MapContainer.getInstance(false)).removeRequester(ctx.getServerHandler().player);
                 else {
-                    ((MapContainerServer) MapContainer.getINSTANCE()).requestTileServer(message.x, message.z, ctx.getServerHandler().player, MapContainerServer.RELOAD_TILE);
+                    ((MapContainerServer) MapContainer.getInstance(false)).requestTileLoading(message.x, message.z, ctx.getServerHandler().player);
                 }
             });
             return null;

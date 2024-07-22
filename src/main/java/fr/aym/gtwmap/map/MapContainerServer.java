@@ -2,169 +2,176 @@ package fr.aym.gtwmap.map;
 
 import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.network.CS18PacketMapPart;
+import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.Getter;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
-public class MapContainerServer extends MapContainer implements Function<PartPos, Void> {
-    private Map<PartPos, List<EntityPlayerMP>> requests = new ConcurrentHashMap<>();
-    private Map<EntityPlayer, Set<PartPos>> requestsRevesed = new ConcurrentHashMap<>();
-    private Map<PartPos, Set<EntityPlayerMP>> pendingUpdates = new ConcurrentHashMap<>();
+public class MapContainerServer extends MapContainer {
+    private final Map<PartPos, List<EntityPlayerMP>> requests = new ConcurrentHashMap<>();
+    private final Map<EntityPlayer, Set<PartPos>> requestsReversed = new ConcurrentHashMap<>();
+    private final Map<PartPos, Set<EntityPlayerMP>> pendingUpdates = new ConcurrentHashMap<>();
 
     @Getter
-    private static Map<PartPos, Set<Function<MapPart, Void>>> loadQueue = new ConcurrentHashMap<>();
+    private final Map<PartPos, CompletableFuture<MapPart>> loadQueue = new ConcurrentHashMap<>();
 
-    public static final Function<MapPart, Void> RELOAD_TILE = t -> {
-        t.updateMapContents();
-        return null;
-    };
-    public static final Function<MapPart, Void> T2 = t -> {
-        System.out.println("Applyed request of " + t.getPos());
-        return null;
-    };
+    public MapContainerServer() {
+        setThisServerInstance();
+    }
 
-    public static void updateQueue(World world, MapContainerServer mapContainer) {
-        if (!loadQueue.isEmpty()) {
-            Entry<PartPos, Set<Function<MapPart, Void>>> entry = loadQueue.entrySet().iterator().next();
-            if (mapContainer.requestDirect(entry.getKey()) == null) {
+    //TODO STATIC ???
+    public void updateQueue(World world) {
+        while (!loadQueue.isEmpty()) {
+            Entry<PartPos, CompletableFuture<MapPart>> entry = loadQueue.entrySet().iterator().next();
+            MapPart part = requestDirect(entry.getKey());
+            if (part == null) {
                 try {
-                    MapPart part = MapLoader.loadPartAt(world, entry.getKey(), mapContainer);
+                    part = MapLoader.getInstance().loadPartFromFile(world, entry.getKey());
                     if (part != null) {
-                        mapContainer.tiles.put(entry.getKey(), part);
-                        for (Function<MapPart, Void> func : entry.getValue()) {
-                            if (func != null)
-                                func.apply(part);
-                        }
-                        return;
+                        tiles.put(entry.getKey(), part);
+                        entry.getValue().complete(part);
+                        continue;
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    GtwMapMod.log.fatal("Error loading map part at {} {} from queue", entry.getKey(), e);
                 }
             }
-            MapPart part = mapContainer.requestTile(world, entry.getKey(), mapContainer, null);
-            for (Function<MapPart, Void> func : entry.getValue())
-                func.apply(part);
+            if (part == null)
+                part = requestTile(world, entry.getKey(), null);
+            entry.getValue().complete(part);
             loadQueue.remove(entry.getKey());
         }
     }
 
     @Override
-    public MapPart requestTile(int x, int z, World world, EntityPlayer requester) {
-        /*if (x < 0)
-            x -= 400;
-        if (z < 0)
-            z -= 400;*/
-        PartPos pos = new PartPos(x / TILE_WIDTH, z / TILE_HEIGHT);
-
+    protected MapPart requestTile(World world, PartPos pos, @Nullable EntityPlayer requester) {
         if (requester != null) {
             if (!requests.containsKey(pos)) {
-                List list = new ArrayList<>();
-                list.add(requester);
+                List<EntityPlayerMP> list = new ArrayList<>();
+                list.add((EntityPlayerMP) requester);
                 requests.put(pos, list);
-                //System.out.println("Add target: "+requester+" "+pos);
-            } else
+            } else {
                 requests.get(pos).add((EntityPlayerMP) requester);
-
-            if (!requestsRevesed.containsKey(requester)) {
-                Set list = new HashSet<>();
+            }
+            if (!requestsReversed.containsKey(requester)) {
+                Set<PartPos> list = new HashSet<>();
                 list.add(pos);
-                requestsRevesed.put(requester, list);
-            } else
-                requestsRevesed.get(requester).add(pos);
-        }
-
-        if (requestDirect(pos) == null) {
-            try {
-                MapPart part = MapLoader.loadPartAt(world, pos, this);
-                if (part != null) {
-                    tiles.put(pos, part);
-                    return part;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+                requestsReversed.put(requester, list);
+            } else {
+                requestsReversed.get(requester).add(pos);
             }
         }
-        return super.requestTile(world, pos, this, null);
+        MapPart part = requestDirect(pos);
+        if (part != null) {
+            return part;
+        }
+        try {
+            part = MapLoader.getInstance().loadPartFromFile(world, pos);
+            if (part != null) {
+                tiles.put(pos, part);
+                return part;
+            }
+        } catch (IOException e) {
+            GtwMapMod.log.fatal("Error loading map part at {} {}", pos, e);
+        }
+        return super.requestTile(world, pos, requester);
     }
 
-    public void requestTileServer(int x, int z, EntityPlayer requester, Function<MapPart, Void> action) {
-        /*if (x < 0)
-            x -= 400;
-        if (z < 0)
-            z -= 400;*/
-        PartPos pos = new PartPos(x / TILE_WIDTH, z / TILE_HEIGHT);
-
+    public CompletableFuture<MapPart> requestTileLoading(int x, int z, EntityPlayer requester) {
+        PartPos pos = new PartPos(x / GtwMapConstants.TILE_SIZE, z / GtwMapConstants.TILE_SIZE);
         if (requester != null) {
             if (!requests.containsKey(pos)) {
-                List list = new ArrayList<>();
-                list.add(requester);
+                List<EntityPlayerMP> list = new ArrayList<>();
+                list.add((EntityPlayerMP) requester);
                 requests.put(pos, list);
-                //System.out.println("Add target: "+requester+" "+pos);
-            } else
+            } else {
                 requests.get(pos).add((EntityPlayerMP) requester);
-
-            if (!requestsRevesed.containsKey(requester)) {
-                Set list = new HashSet<>();
+            }
+            if (!requestsReversed.containsKey(requester)) {
+                Set<PartPos> list = new HashSet<>();
                 list.add(pos);
-                requestsRevesed.put(requester, list);
-            } else
-                requestsRevesed.get(requester).add(pos);
+                requestsReversed.put(requester, list);
+            } else {
+                requestsReversed.get(requester).add(pos);
+            }
         }
-        if (!loadQueue.containsKey(pos)) {
-            Set<Function<MapPart, Void>> set = new HashSet();
-            set.add(action);
-            loadQueue.put(pos, set);
-        } else {
-            loadQueue.get(pos).add(action);
+        MapPart part = requestDirect(pos);
+        CompletableFuture<MapPart> future = new CompletableFuture<>();
+        if(part != null) {
+            part.refreshMapContents();
+            future.complete(part);
+            return future;
         }
-    }
-
-    @Override
-    public Void apply(PartPos t) {
-        if (requests.containsKey(t)) {
-            Set list;
-            if (!pendingUpdates.containsKey(t)) {
-                list = new HashSet<>();
-                pendingUpdates.put(t, list);
-            } else
-                list = pendingUpdates.get(t);
-            list.addAll(requests.get(t));
-        }
-        return null;
+        loadQueue.put(pos, future);
+        return future;
     }
 
     public void update() {
-        Iterator<Entry<PartPos, Set<EntityPlayerMP>>> it = pendingUpdates.entrySet().iterator();
-        for (int i = 0; it.hasNext(); i++) {
-            Entry<PartPos, Set<EntityPlayerMP>> e = it.next();
+        for (Entry<PartPos, Set<EntityPlayerMP>> e : pendingUpdates.entrySet()) {
             MapPart part = requestDirect(e.getKey());
             if (part == null) {
-                GtwMapMod.log.error("Part has been removed before update: {}", e.getKey());
+                GtwMapMod.log.warn("Part has been removed before update: {}", e.getKey());
                 continue;
             }
-            CS18PacketMapPart pkt = new CS18PacketMapPart(requestDirect(e.getKey()));
+            CS18PacketMapPart pkt = new CS18PacketMapPart(part, MapLoader.getInstance().getLoadingParts().size());
             for (EntityPlayerMP player : e.getValue()) {
-                //System.out.println("Send to: "+player+" "+e.getKey());
                 GtwMapMod.getNetwork().sendTo(pkt, player);
             }
         }
         pendingUpdates.clear();
+        if (MapLoader.getInstance().getLoadingParts().isEmpty() && getLoadQueue().isEmpty()) {
+            if (MapLoader.godMode != 0) {
+                System.out.println("Render end !");
+                MapLoader.godMode = 0;
+            }
+            if (MapLoader.listener != null) {
+                MapLoader.listener.sendMessage(new TextComponentString("Opération terminée !"));
+                MapLoader.listener = null;
+            }
+            MapLoader.amountToLoad = 0;
+        }
     }
 
     public void removeRequester(EntityPlayer player) {
         //pendingUpdates.remove(player);
-        Set<PartPos> pos = requestsRevesed.remove(player);
+        System.out.println("REQUESTER REMOVE " + player);
+        Set<PartPos> pos = requestsReversed.remove(player);
         if (pos != null) {
             for (PartPos p : pos) {
                 requests.get(p).remove(player);
             }
+        }
+    }
+
+    @Override
+    protected MapPart createMapPart(World world, PartPos pos, int width, int length) {
+        MapPart part = new MapPartServer(world, pos, width, length);
+        part.refreshMapContents(); // will load the map part
+        return part;
+    }
+
+    public void onContentsChange(MapPart part) {
+        PartPos t = part.getPos();
+        System.out.println("Contents change " + t + " " + requests.containsKey(t) + " " + requests);
+        if (requests.containsKey(t)) {
+            Set<EntityPlayerMP> list;
+            if (!pendingUpdates.containsKey(t)) {
+                list = new HashSet<>();
+                pendingUpdates.put(t, list);
+            } else {
+                list = pendingUpdates.get(t);
+            }
+            list.addAll(requests.get(t));
+            System.out.println("Pending updates are now " + pendingUpdates);
         }
     }
 }

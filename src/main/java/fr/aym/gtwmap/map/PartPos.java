@@ -1,5 +1,7 @@
 package fr.aym.gtwmap.map;
 
+import fr.aym.gtwmap.utils.GtwMapConstants;
+
 public class PartPos {
     public final int xOrig;
     public final int zOrig;
@@ -29,10 +31,10 @@ public class PartPos {
     }
 
     public int getInWorldX() {
-        return xOrig * MapContainer.TILE_WIDTH;
+        return xOrig * GtwMapConstants.TILE_SIZE;
     }
 
     public int getInWorldZ() {
-        return zOrig * MapContainer.TILE_HEIGHT;
+        return zOrig * GtwMapConstants.TILE_SIZE;
     }
 }

@@ -2,6 +2,7 @@ package fr.aym.gtwmap;
 
 import fr.aym.acsguis.api.ACsGuiApi;
 import fr.aym.gtwmap.client.gui.GuiMapTest;
+import fr.aym.gtwmap.client.gui.GuiMinimap;
 import fr.aym.gtwmap.common.CommonProxy;
 import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapContainerServer;
@@ -41,12 +42,11 @@ public class GtwMapMod {
 
     public GtwMapMod() {
         ACsGuiApi.registerStyleSheetToPreload(GuiMapTest.STYLE);
-        System.out.println("REGISTERED STYLE");
+        ACsGuiApi.registerStyleSheetToPreload(GuiMinimap.STYLE);
     }
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
-        ACsGuiApi.registerStyleSheetToPreload(GuiMapTest.STYLE);
         log.info("Mod " + NAME + " version " + VERSION + " is running. By Aym'.");
         Config.load(event.getSuggestedConfigurationFile(), event.getSide());
 
@@ -68,7 +68,7 @@ public class GtwMapMod {
 
     @Mod.EventHandler
     public void onServerStarting(FMLServerStartingEvent event) {
-        MapLoader.init(event, new MapContainerServer());
+        new MapLoader(event, new MapContainerServer());
         event.registerServerCommand(new CommandGtwMap());
     }
 }

@@ -3,18 +3,16 @@ package fr.aym.gtwmap.map;
 import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import lombok.Getter;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
 import java.awt.*;
-import java.util.function.Function;
+import java.util.Arrays;
 
-public class MapPart {
+public abstract class MapPart {
     @Getter
     private final PartPos pos;
     @Getter
@@ -23,13 +21,13 @@ public class MapPart {
     private final int length;
     @Getter
     private final int[] mapTextureData;
-    private final Function<PartPos, Void> reloadCallable;
     @Getter
     private final World world;
 
-    private State dirty = State.NOT_SET;
+    @Getter
+    private State state = State.NOT_SET;
 
-    public MapPart(World world, PartPos pos, int width, int length, @Nullable Function<PartPos, Void> reloadCallable2, @Nullable int[] textureData) {
+    protected MapPart(World world, PartPos pos, int width, int length, @Nullable int[] textureData) {
         this.world = world;
         this.pos = pos;
         this.width = width;
@@ -38,35 +36,38 @@ public class MapPart {
             this.mapTextureData = textureData;
         else
             this.mapTextureData = new int[width * length];
-        for (int i = 0; i < this.mapTextureData.length; ++i) {
-            this.mapTextureData[i] = Color.lightGray.getRGB();
-        }
-        this.reloadCallable = reloadCallable2;
+        fillWithColor(Color.LIGHT_GRAY.getRGB());
     }
 
-    public void updateMapContents() {
-        if (dirty() || mapTextureData[0] == Color.lightGray.getRGB()) {
+    public void fillWithColor(int color) {
+        Arrays.fill(mapTextureData, color);
+    }
+
+    public void refreshMapContents() {
+        if (!world.isRemote) {
+            System.out.println("Refreshing " + this + " " + this.pos + " " + state);
+        }
+        if (state != State.LOADED && state != State.LOADING) {
             if (world.isRemote) {
-                onChange(); //Will put gray on client
-                dirty = false;
+                onContentsChange(); //Will put gray on client
+                state = State.LOADING;
                 int x = pos.xOrig * 400;
                 int z = pos.zOrig * 400;
-                /*if (x < 0)
-                    x += 400;
-                if (z < 0)
-                    z += 400;*/
-                System.out.println("CHANGE >>> Requesting "+this+" "+this.pos+" "+x+" "+z);
+                System.out.println("CHANGE >>> Requesting " + this + " " + this.pos + " " + x + " " + z);
                 GtwMapMod.getNetwork().sendToServer(new S19PacketMapPartQuery(x, z));
             } else {
                 try {
-                    MapLoader.load(this);
-                    dirty = false;
+                    MapLoader.getInstance().load(this);
+                    state = State.LOADING;
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    GtwMapMod.log.fatal("Error loading map part {}", this, e);
+                    state = State.ERRORED;
+                    fillWithColor(Color.RED.getRGB());
                 }
             }
-        } else
-            onChange();
+        } else {
+            onContentsChange();
+        }
     }
 
     @SideOnly(Side.CLIENT)
@@ -79,46 +80,33 @@ public class MapPart {
     			color = Color.BLACK.getRGB(); //Area not loaded
     		else
     			//TODO */
+            /*if (i % 2 == 0) {
+                mapTextureData[i] = -9594576;
+            } else {
+                mapTextureData[i] = -16711681;
+            }*/
             mapTextureData[i] = data[i];
         }
-        onChangeClient();
+        setDirty(false, null);
+        onContentsChange();
     }
 
-    public void onChange() {
-        if (reloadCallable == null)
-            return;
-        if (FMLCommonHandler.instance().getSide().isServer())
-            onChangeServer();
-        else
-            onChangeClient();
-    }
-
-    private void onChangeServer() {
-        FMLCommonHandler.instance().getMinecraftServerInstance().addScheduledTask(() -> reloadCallable.apply(pos));
-    }
-
-    @SideOnly(Side.CLIENT)
-    private void onChangeClient() {
-        Minecraft.getMinecraft().addScheduledTask(() -> reloadCallable.apply(pos));
-    }
+    public abstract void onContentsChange();
 
     public MapPart setDirty(boolean dirty, @Nullable BlockPos mark) {
         if (mark != null) {
             int x = mark.getX() - pos.getInWorldX();
             int z = mark.getZ() - pos.getInWorldZ();
             if ((z * getLength() + x) > mapTextureData.length || (z * getLength() + x) < 0) {
-                System.out.println("OUTOFBOUND " + x + z + getWidth() + getLength() + mapTextureData.length + " " + mark + " " + pos + " " + this + " == " + (z * getLength() + x));
-                this.dirty = true;
+                System.out.println("Mark OUTOFBOUND " + x + z + getWidth() + getLength() + mapTextureData.length + " " + mark + " " + pos + " " + this + " == " + (z * getLength() + x));
+                this.state = State.ERRORED;
+                fillWithColor(Color.ORANGE.getRGB());
                 return this;
             }
-            mapTextureData[z * this.getLength() + x] = Color.lightGray.getRGB();
+            mapTextureData[z * this.getLength() + x] = Color.LIGHT_GRAY.getRGB();
         }
-        this.dirty = dirty;
+        this.state = dirty ? State.DIRTY : State.LOADED;
         return this;
-    }
-
-    public boolean dirty() {
-        return dirty;
     }
 
     public enum State {
