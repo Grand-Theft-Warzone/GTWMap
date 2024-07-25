@@ -20,23 +20,24 @@ import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.AllArgsConstructor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.MathHelper;
+import org.lwjgl.util.glu.GLU;
 
-import java.awt.*;
-import java.util.List;
 import java.util.*;
+
+import static org.lwjgl.opengl.GL11.*;
 
 public class GuiMinimap extends GuiFrame {
     public static final ResourceLocation STYLE = new ResourceLocation(GtwMapConstants.ID, "css/gui_mini_map.css");
 
-    private final GuiPanel mapPane;
-    private final Map<PartPos, GuiPanel> partsStore = new HashMap<>();
-
-    private final GuiLabel myPos;
-
     private Viewport viewport;
     private float playerX, playerZ;
+
+    private GuiPanel mapPane;
+    private final Map<PartPos, GuiPanel> partsStore = new HashMap<>();
+
+    private GuiLabel myPos;
 
     public GuiMinimap() {
         super(new GuiScaler.AdjustToScreenSize(true, 0.3f, 0.3f));
@@ -52,22 +53,9 @@ public class GuiMinimap extends GuiFrame {
         mapPane.setCssId("map_pane");
         pane.add(mapPane);
         add(pane);
-        pane.addWheelListener(dWheel -> {
-            float amount = dWheel / 60;
-            if (dWheel > 0)
-                amount = MathHelper.clamp((float) (amount / 4), 1.111111F, 2f);
-            else
-                amount = MathHelper.clamp((float) (amount * -1 / 2.5F), 0, 0.999999F);
-            updateViewport(new Viewport(viewport.x, viewport.y, (int) (viewport.width * amount), (int) (viewport.height * amount)));
-        });
         mapPane.add(myPos = (GuiLabel) new GuiLabel("V").setCssId("custom_marker").setCssClass("waypoint"));
     }
 
-    /*
-     * DrawLife
-     * xmin = 6144 ; zmin = 4512
-     * xmax = 15232 ; zmax = 13696
-     */
     private void updateViewport(Viewport newViewport) {
         if (/*newViewport.width > 5000 || newViewport.height > 7000 || */newViewport.width < 50 || newViewport.height < 50)
             //DRAWLIFE if(newViewport.x < 6144 || newViewport.width+newViewport.x > 15232 || newViewport.y < 4512 || newViewport.height+newViewport.y > 13696 || newViewport.width < 50 || newViewport.height < 50)
@@ -250,9 +238,6 @@ public class GuiMinimap extends GuiFrame {
     @Override
     public void drawForeground(int mouseX, int mouseY, float partialTicks) {
         super.drawForeground(mouseX, mouseY, partialTicks);
-        int x = (int) (viewport.x + (mouseX - mapPane.getRenderMinX()) * viewport.width / (mapPane.getWidth() == 0 ? 1 : mapPane.getWidth()));
-        int z = (int) (viewport.y + (mouseY - mapPane.getRenderMinY()) * viewport.height / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight()));
-        mc.fontRenderer.drawString("x= " + x + " z=" + z, mouseX + 10, mouseY + 10, Color.WHITE.getRGB());
     }
 
     @Override
@@ -279,6 +264,92 @@ public class GuiMinimap extends GuiFrame {
 
     @AllArgsConstructor
     public static class Viewport {
-        private float x, y, width, height;
+        protected float x, y, width, height;
+    }
+
+    @Override
+    protected void bindLayerBounds() {
+        if (!Minecraft.getMinecraft().getFramebuffer().isStencilEnabled())
+            Minecraft.getMinecraft().getFramebuffer().enableStencil();
+
+        //   CircleBackground.renderBackground(0, 0, 0, resolution.getScaledWidth(), resolution.getScaledHeight(), Color.RED.getRGB());
+// Enable stencil testing
+        /*glEnable(GL_STENCIL_TEST);
+        glClear(GL_STENCIL_BUFFER_BIT);
+        glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilMask(0xFF);*/
+        glEnable(GL_STENCIL_TEST);
+        glColorMask(false, false, false, false);
+        glDepthMask(false);
+        glStencilFunc(GL_NEVER, 1, 0xFF);
+        glStencilOp(GL_REPLACE, GL_KEEP, GL_KEEP);  // draw 1s on test fail (always)
+        // draw stencil pattern
+        glStencilMask(0xFF);
+        glClear(GL_STENCIL_BUFFER_BIT);  // needs mask=0xFF
+
+// Draw the circle to the stencil buffer
+        glDisable(GL_TEXTURE_2D);
+        glBegin(GL_TRIANGLE_FAN);
+        float cx = (getRenderMaxX() - getRenderMinX()) / 2f + getRenderMinX();
+        float cy = (getRenderMaxY() - getRenderMinY()) / 2f + getRenderMinY();
+        //glVertex3f(cx, cy, 0); // Center of the circle
+        int num_segments = 100;
+        float radius = (getRenderMaxX() - getRenderMinX()) / 2f;
+        /*for (int i = 0; i <= num_segments; i++) {
+            float theta = 2.0f * 3.1415926f * i / num_segments; // Current angle
+            float x = (float) (radius * Math.cos(theta)); // Calculate the x component
+            float y = (float) (radius * Math.sin(theta)); // Calculate the y component
+            glVertex3f(x + cx, y + cy, 0); // Output vertex
+        }*/
+        float start = 0;
+        float twicePi = (float) (2.0f * Math.PI);
+        int triangleAmount = 50;
+        for (int i = 0; i <= triangleAmount; i++) {
+            GlStateManager.glVertex3f(
+                    (float) (cx + (radius * Math.sin(start + (float) i * twicePi / (float) triangleAmount))),
+                    (float) (cy + (radius * Math.cos(start + (float) i * twicePi / (float) triangleAmount))), 0
+            );
+        }
+        glEnd();
+        //CircleBackground.renderBackground(0, cx-radius, cy-radius, cx+radius, cy+radius, Color.YELLOW.getRGB());
+        glEnable(GL_TEXTURE_2D);
+
+// Enable stencil testing to only render within the circle
+        //glStencilFunc(GL_EQUAL, 1, 0xFF);
+        //glStencilMask(0x00);
+        glColorMask(true, true, true, true);
+        glDepthMask(true);
+        glStencilMask(0x00);
+        // draw where stencil's value is 0
+        glStencilFunc(GL_EQUAL, 0, 0xFF);
+        /* (nothing to draw) */
+        // draw only where stencil's value is 1
+        glStencilFunc(GL_EQUAL, 1, 0xFF);
+
+        int i = GlStateManager.glGetError();
+        if (i != 0) {
+            String s = GLU.gluErrorString(i);
+            System.out.println("GL ERROR: " + i + " " + s);
+        }
+
+        //CircleBackground.renderBackground(0, 0, 0, resolution.getScaledWidth(), resolution.getScaledHeight(), Color.GREEN.getRGB());
+        //  CircleBackground.renderBackground(0, cx-radius, cy-radius, cx+radius, cy+radius, Color.YELLOW.getRGB());
+    }
+
+    @Override
+    protected void unbindLayerBounds() {
+        // CircleBackground.renderBackground(0, 0, 0, resolution.getScaledWidth(), resolution.getScaledHeight(), Color.BLUE.getRGB());
+        float cx = 59.5f;
+        float cy = 59.5f;
+        float radius = 49.5f;
+        //CircleBackground.renderBackground(0, cx-radius, cy-radius, cx+radius, cy+radius, Color.YELLOW.getRGB());
+        glDisable(GL_STENCIL_TEST);
+
+        int i = GlStateManager.glGetError();
+        if (i != 0) {
+            String s = GLU.gluErrorString(i);
+            System.out.println("GL ERROR: " + i + " " + s);
+        }
     }
 }

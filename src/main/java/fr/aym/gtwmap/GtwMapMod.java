@@ -7,6 +7,7 @@ import fr.aym.gtwmap.common.CommonProxy;
 import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapContainerServer;
 import fr.aym.gtwmap.map.MapLoader;
+import fr.aym.gtwmap.network.BBMessageGpsNodes;
 import fr.aym.gtwmap.network.CS18PacketMapPart;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import fr.aym.gtwmap.server.CommandGtwMap;
@@ -55,6 +56,8 @@ public class GtwMapMod {
         network = NetworkRegistry.INSTANCE.newSimpleChannel(ID + ".ch");
         network.registerMessage(CS18PacketMapPart.Handler.class, CS18PacketMapPart.class, 18, Side.CLIENT);
         network.registerMessage(S19PacketMapPartQuery.Handler.class, S19PacketMapPartQuery.class, 190, Side.SERVER);
+        network.registerMessage(BBMessageGpsNodes.HandlerClient.class, BBMessageGpsNodes.class, 191, Side.CLIENT);
+        network.registerMessage(BBMessageGpsNodes.HandlerServer.class, BBMessageGpsNodes.class, 192, Side.SERVER);
     }
 
     @Mod.EventHandler

@@ -40,6 +40,13 @@
     color: red;
 }
 
+#gps_node {
+    color: orange;
+}
+#gps_node:hover {
+    color: cyan;
+}
+
 #map_pane > panel {
     background-color: translucent;
     left: auto;
