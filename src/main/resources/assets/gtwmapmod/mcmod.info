@@ -1,0 +1,18 @@
+[
+  {
+    "modid": "GtwMap",
+    "name": "Grand Theft Warzone Map",
+    "description": "",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": [
+      "Aym'"
+    ],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]

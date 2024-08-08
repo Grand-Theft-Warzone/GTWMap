@@ -4,6 +4,7 @@ import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapContainerServer;
 import fr.aym.gtwmap.map.MapPart;
+import fr.aym.gtwmap.utils.GtwMapConstants;
 import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
@@ -28,7 +29,13 @@ public class ServerEventHandler {
     public void blockNotif(BlockEvent.NeighborNotifyEvent event) {
         //if(true)
           //  return;
-        ((MapContainerServer) MapContainer.getInstance(false)).requestTileLoading(event.getPos().getX(), event.getPos().getZ(), null).whenComplete((p, e) -> {
+        int x = event.getPos().getX();
+        int z = event.getPos().getZ();
+        if(x < 0)
+            x -= 399;
+        if(z < 0)
+            z -= 399;
+        ((MapContainerServer) MapContainer.getInstance(false)).requestTileLoading(x, z, null).whenComplete((p, e) -> {
             if(e != null) {
                 GtwMapMod.log.error("Error marking map part as dirty at {}", event.getPos(), e);
             }

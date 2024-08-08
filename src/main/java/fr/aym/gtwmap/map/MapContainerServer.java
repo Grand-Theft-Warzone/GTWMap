@@ -28,7 +28,6 @@ public class MapContainerServer extends MapContainer {
         setThisServerInstance();
     }
 
-    //TODO STATIC ???
     public void updateQueue(World world) {
         while (!loadQueue.isEmpty()) {
             Entry<PartPos, CompletableFuture<MapPart>> entry = loadQueue.entrySet().iterator().next();

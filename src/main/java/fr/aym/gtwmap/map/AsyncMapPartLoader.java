@@ -1,6 +1,7 @@
 package fr.aym.gtwmap.map;
 
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.utils.BlockColorConfig;
 import lombok.RequiredArgsConstructor;
 import net.minecraft.block.material.MapColor;
 import net.minecraft.block.state.IBlockState;
@@ -53,22 +54,28 @@ public class AsyncMapPartLoader implements Runnable {
                 //    System.out.println("Params put: " + put + " pos: " + pos + " x: " + x + " z: " + z + " xip " + xInPart + " zip " + zInPart + " pxc " + posXInChunk + " pzc " + posZInChunk);
                 if (godMode == 2 || val == Color.LIGHT_GRAY.getRGB() || (godMode >= 1 && (val == Color.RED.getRGB() || val == Color.CYAN.getRGB() || val == Color.ORANGE.getRGB()))) {
                     long s = System.currentTimeMillis();
-                    MapColor color = null;
+                    int color = MapColor.AIR.colorValue;
                     if (chunk != null) {
                         IBlockState state;
                         //TODO PAS OUF CI-DESSOUS
                         for (pos2 = pos2.setPos(pos.getX(), chunk.getTopFilledSegment() + 16, pos.getZ()); pos2.getY() >= 0; pos2.setPos(pos3)) {
                             pos3 = pos2.down();
                             state = chunk.getBlockState(pos3);
+                            if(!state.isTopSolid()) {
+                                continue;
+                            }
                             //if (state.getMaterial().blocksMovement() /*&& !state.getBlock().isLeaves(state, world, blockpos1) && !state.getBlock().isFoliage(world, blockpos1) */|| state.getMaterial().isLiquid())
                             {
-                                color = state.getMapColor(world, pos3);
-                                if (color != MapColor.AIR)
+                                color = BlockColorConfig.getBlockColor(state);//state.getMapColor(world, pos3);
+                                // this is the color that gets returned for air
+                                if (color != -8650628) {
+                                    color = BlockColorConfig.getColumnColour(chunk, pos3.getX(), pos3.getY(), pos3.getZ(), state, color, getPixelHeightW(target.getMapTextureData(), put, target.getLength()), getPixelHeightN(target.getMapTextureData(), put, target.getLength()));
                                     break;
+                                }
                             }
                         }
-                        if (color != null && color != MapColor.AIR) {
-                            target.getMapTextureData()[put] = getMapColorOver(1, color.colorValue);
+                        if (color != MapColor.AIR.colorValue) {
+                            target.getMapTextureData()[put] = getMapColorOver(1, color);
                         } else {
                             target.getMapTextureData()[put] = Color.BLACK.getRGB();
                         }
@@ -102,6 +109,14 @@ public class AsyncMapPartLoader implements Runnable {
         return false;
     }
 
+    static int getPixelHeightN(int[] pixels, int offset, int scanSize) {
+        return (offset >= scanSize) ? ((pixels[offset - scanSize] >> 24) & 0xff) : -1;
+    }
+
+    static int getPixelHeightW(int[] pixels, int offset, int scanSize) {
+        return ((offset & (scanSize - 1)) >= 1) ? ((pixels[offset - 1] >> 24) & 0xff) : -1;
+    }
+
     @Override
     public void run() {
         try {
@@ -110,13 +125,13 @@ public class AsyncMapPartLoader implements Runnable {
             for (int x = 0; x < target.getWidth(); x += 16) {
                 long segmentStart = System.currentTimeMillis();
                 for (int z = 0; z < target.getLength(); z += 16) {
-                    if(loadChunk(world, x, z)) {
+                    if (loadChunk(world, x, z)) {
                         return; // Async chunk loading started
                     }
                 }
                 long took = System.currentTimeMillis() - segmentStart;
                 if (took > 4) {
-                   // System.out.println("Took " + (took) + "ms for chunk segment " + x + " of " + target.getPos());
+                    // System.out.println("Took " + (took) + "ms for chunk segment " + x + " of " + target.getPos());
                 }
             }
             target.onContentsChange();

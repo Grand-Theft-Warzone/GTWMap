@@ -35,7 +35,6 @@ public class MapLoader {
     private final Set<MapPart> loadingParts = new ConcurrentSet<>();
     @Getter
     private final Queue<MapPart> saveQueue = Queues.newArrayDeque();
-    private int phase = 0; //TODO REMOVE
 
     public final ThreadPoolExecutor pool = new ThreadPoolExecutor(
             10, // core pool size
@@ -71,7 +70,7 @@ public class MapLoader {
     }
 
     public void loadArea(int xmin, int xmax, int zmin, int zmax, int mode, ICommandSender sender) {
-        System.out.println("Mode is " + godMode + " " + listener + " " + loadingParts + " " + phase);
+        System.out.println("Mode is " + godMode + " " + listener + " " + loadingParts);
         //listener = null;
         MapContainerServer mapContainer = (MapContainerServer) MapContainer.getInstance(false);
         if (listener == null) {
@@ -132,7 +131,7 @@ public class MapLoader {
                         data[i] = val;
                         //if(pos.xOrig == 0 && pos.zOrig == 0)
                         //  System.out.println("Loading " + pos + " " + i + " " + val +" " + Color.CYAN.getRGB() +" //GOD// " + godMode);
-                        if (val == Color.LIGHT_GRAY.getRGB() || (godMode == 1 && (val == Color.RED.getRGB() || val == Color.CYAN.getRGB() || val == Color.ORANGE.getRGB())))
+                        if (val == Color.LIGHT_GRAY.getRGB() || (godMode == 1 && (val == Color.RED.getRGB() || val == Color.BLACK.getRGB() || val == Color.ORANGE.getRGB())))
                             gray = true;
                     }
                 }

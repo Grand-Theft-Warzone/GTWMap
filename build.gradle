@@ -30,8 +30,8 @@ apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'idea'
 
 version = version_major + "." + version_minor + "." + version_patch
-group = "fr.aym.gtwnpc"
-archivesBaseName = "GtwNpc"
+group = package_name
+archivesBaseName = mod_name
 
 compileJava.options.encoding = 'UTF-8'
 
@@ -61,7 +61,7 @@ dependencies {
 
     //implementation "fr.aym:ACsLib:1.2.12"
     compileOnly 'org.projectlombok:lombok:1.18.24'
-    implementation ":ACsGuis:1.2.13-all"
+    implementation ":ACsGuis:1.2.14-dev1-all"
 
     implementation 'org.joml:joml:1.10.5'
 

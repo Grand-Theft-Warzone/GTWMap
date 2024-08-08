@@ -77,7 +77,7 @@ public class GpsNodes extends WorldSavedData implements ISerializable {
         return nodes.values().stream().filter(n -> !avoidNodes.contains(n)).min(Comparator.comparingDouble(gpsNode -> gpsNode.getDistance(around))).orElse(null);
     }
 
-    public Queue<GpsNode> createPathToNode(GpsNode startNode, GpsNode end) {
+    public List<GpsNode> createPathToNode(GpsNode startNode, GpsNode end) {
         //TOO REWORK
         // System.out.println("Start node : " + startNode + " from " + startPos);
         Queue<GpsRouteNode> openSet = new PriorityQueue<>();
@@ -88,18 +88,14 @@ public class GpsNodes extends WorldSavedData implements ISerializable {
         while (!openSet.isEmpty()) {
             GpsRouteNode next = openSet.poll();
             if (next.getCurrent().equals(end)) {
-                List<GpsNode> route = new ArrayList<>();
+                List<GpsNode> route = new LinkedList<>();
                 GpsRouteNode current = next;
                 do {
                     route.add(0, current.getCurrent());
                     current = allNodes.get(current.getPrevious());
                 } while (current != null);
                 //Reverse
-                Queue<GpsNode> path = new ArrayDeque<>(route.size());
-                for (GpsNode p : route)
-                    path.add(p);
-                //System.out.println("Created path : " + route.stream().map(PathNode::getPosition).collect(java.util.stream.Collectors.toList()));
-                return path;
+                return route;
             }
             next.getCurrent().getNeighbors(this).forEach(connection -> {
                 GpsRouteNode nextNode = allNodes.getOrDefault(connection, new GpsRouteNode(connection));

@@ -7,6 +7,7 @@ import fr.aym.gtwmap.network.BBMessageGpsNodes;
 import lombok.Getter;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
+import org.joml.Vector2f;
 
 import javax.vecmath.Vector3f;
 import java.util.*;
@@ -19,6 +20,8 @@ public class GpsNode implements ISerializable, ISerializablePacket {
     protected Vector3f position;
     protected Set<GpsNode> neighbors;
     protected Set<UUID> neighborsIds;
+    @Getter
+    protected Map<UUID, BezierCurveLink> bezierCurves;
 
     public GpsNode() {
     }
@@ -27,6 +30,7 @@ public class GpsNode implements ISerializable, ISerializablePacket {
         this.position = position;
         this.neighbors = neighbors;
         this.id = UUID.randomUUID();
+        this.bezierCurves = new HashMap<>();
     }
 
     public Set<GpsNode> getNeighbors(GpsNodes manager) {
@@ -50,8 +54,8 @@ public class GpsNode implements ISerializable, ISerializablePacket {
     @Override
     public Object[] getObjectsToSave() {
         if (neighborsIds != null) // Nodes not resolved yet
-            return new Object[]{id, position.x, position.y, position.z, neighborsIds};
-        return new Object[]{id, position.x, position.y, position.z, neighbors.stream().map(GpsNode::getId).collect(Collectors.toList())};
+            return new Object[]{id, position.x, position.y, position.z, neighborsIds, bezierCurves};
+        return new Object[]{id, position.x, position.y, position.z, neighbors.stream().map(GpsNode::getId).collect(Collectors.toList()), bezierCurves};
     }
 
     @Override
@@ -63,11 +67,10 @@ public class GpsNode implements ISerializable, ISerializablePacket {
             neighbors.clear();
             neighbors = null;
         }
-    }
-
-    public AxisAlignedBB getBoundingBox() {
-        //TODO CACHE THE VALUE
-        return new AxisAlignedBB(position.x - 0.5, position.y - 0.5, position.z - 0.5, position.x + 0.5, position.y + 0.5, position.z + 0.5);
+        if(objects.length > 5)
+            bezierCurves = (Map<UUID, BezierCurveLink>) objects[5];
+        else
+            bezierCurves = new HashMap<>();
     }
 
     public void create(GpsNodes manager, boolean isRemote) {
@@ -93,11 +96,14 @@ public class GpsNode implements ISerializable, ISerializablePacket {
         }
     }
 
-    public void addNeighbor(GpsNodes manager, GpsNode pointedNode, boolean isRemote) {
+    public void addNeighbor(GpsNodes manager, GpsNode pointedNode, List<Vector2f> bezierCurvePoints, boolean isRemote) {
         if (isRemote)
-            GtwMapMod.network.sendToServer(new BBMessageGpsNodes(BBMessageGpsNodes.Action.LINK_NODES, Arrays.asList(this.getId(), pointedNode.getId())));
+            GtwMapMod.network.sendToServer(new BBMessageGpsNodes(Arrays.asList(this.getId(), pointedNode.getId()), bezierCurvePoints));
         else {
             getNeighbors(manager).add(pointedNode);
+            if(bezierCurvePoints.size() > 2) {
+                bezierCurves.put(pointedNode.getId(), new BezierCurveLink(bezierCurvePoints));
+            }
             manager.markDirty();
         }
     }
@@ -107,6 +113,7 @@ public class GpsNode implements ISerializable, ISerializablePacket {
             GtwMapMod.network.sendToServer(new BBMessageGpsNodes(BBMessageGpsNodes.Action.UNLINK_NODES, Arrays.asList(this.getId(), pointedNode.getId())));
         else {
             getNeighbors(manager).remove(pointedNode);
+            bezierCurves.remove(pointedNode.getId());
             manager.markDirty();
         }
     }
@@ -129,7 +136,7 @@ public class GpsNode implements ISerializable, ISerializablePacket {
     }
 
     public float getDistance(Vec3d around) {
-        return (float) around.subtract(position.x, position.y, position.z).length();
+        return (float) around.subtract(position.x, around.y, position.z).length();
     }
 
     public double getDistance(GpsNode node) {
@@ -147,6 +154,6 @@ public class GpsNode implements ISerializable, ISerializablePacket {
     }
 
     public double getDistance(Vector3f position) {
-        return Math.sqrt(Math.pow(position.x - this.position.x, 2) + Math.pow(position.y - this.position.y, 2) + Math.pow(position.z - this.position.z, 2));
+        return Math.sqrt(Math.pow(position.x - this.position.x, 2) /*+ Math.pow(position.y - this.position.y, 2)*/ + Math.pow(position.z - this.position.z, 2));
     }
 }

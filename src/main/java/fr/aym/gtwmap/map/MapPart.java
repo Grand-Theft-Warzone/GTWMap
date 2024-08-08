@@ -72,21 +72,7 @@ public abstract class MapPart {
 
     @SideOnly(Side.CLIENT)
     public void feedWidthBlockData(int[] data) {
-        // System.out.println("Feeding "+this+" "+this.pos+data[0]+" "+Color.ORANGE.getRGB());
-        for (int i = 0; i < data.length; i++) {
-    		/*IBlockState state = Block.getStateById(data[i]);
-    		int color;
-    		if(state.getBlock() == Blocks.AIR)
-    			color = Color.BLACK.getRGB(); //Area not loaded
-    		else
-    			//TODO */
-            /*if (i % 2 == 0) {
-                mapTextureData[i] = -9594576;
-            } else {
-                mapTextureData[i] = -16711681;
-            }*/
-            mapTextureData[i] = data[i];
-        }
+        System.arraycopy(data, 0, mapTextureData, 0, data.length);
         setDirty(false, null);
         onContentsChange();
     }
@@ -98,7 +84,7 @@ public abstract class MapPart {
             int x = mark.getX() - pos.getInWorldX();
             int z = mark.getZ() - pos.getInWorldZ();
             if ((z * getLength() + x) > mapTextureData.length || (z * getLength() + x) < 0) {
-                System.out.println("Mark OUTOFBOUND " + x + z + getWidth() + getLength() + mapTextureData.length + " " + mark + " " + pos + " " + this + " == " + (z * getLength() + x));
+                System.out.println("Mark OUTOFBOUND x: " + x + " z: " + z + " w: " + getWidth() + " l: " + getLength() + " mtl: " + mapTextureData.length + " mark: " + mark + " pos: " + pos + " " + this + " == " + (z * getLength() + x));
                 this.state = State.ERRORED;
                 fillWithColor(Color.ORANGE.getRGB());
                 return this;

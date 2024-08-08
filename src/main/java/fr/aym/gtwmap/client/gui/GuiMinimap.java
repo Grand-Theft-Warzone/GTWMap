@@ -1,5 +1,7 @@
 package fr.aym.gtwmap.client.gui;
 
+import fr.aym.acsguis.api.GuiAPIClientHelper;
+import fr.aym.acsguis.component.GuiComponent;
 import fr.aym.acsguis.component.layout.GuiScaler;
 import fr.aym.acsguis.component.panel.GuiFrame;
 import fr.aym.acsguis.component.panel.GuiPanel;
@@ -10,6 +12,12 @@ import fr.aym.acsguis.cssengine.selectors.EnumSelectorContext;
 import fr.aym.acsguis.cssengine.style.EnumCssStyleProperties;
 import fr.aym.acsguis.utils.GuiTextureSprite;
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.client.ClientEventHandler;
+import fr.aym.gtwmap.client.gps.GpsNavigator;
+import fr.aym.gtwmap.common.gps.BezierCurveLink;
+import fr.aym.gtwmap.common.gps.GpsNode;
+import fr.aym.gtwmap.common.gps.GpsNodes;
+import fr.aym.gtwmap.common.gps.WaypointNode;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapPartClient;
@@ -18,10 +26,14 @@ import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.AllArgsConstructor;
+import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ResourceLocation;
+import org.joml.Vector2f;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.GLU;
 
 import java.util.*;
@@ -36,8 +48,14 @@ public class GuiMinimap extends GuiFrame {
 
     private GuiPanel mapPane;
     private final Map<PartPos, GuiPanel> partsStore = new HashMap<>();
+    private final Map<EntityPlayer, EntityPosCache> playerPosCache = new HashMap<>();
 
-    private GuiLabel myPos;
+    private final Map<GpsNode, GuiComponent<?>> gpsNodeComponents = new HashMap<>();
+    private GuiComponent<?> customMarkerComponent;
+
+    private float mapSize;
+    private int mapSizeChangeCooldown;
+    private float targetMapSize;
 
     public GuiMinimap() {
         super(new GuiScaler.AdjustToScreenSize(true, 0.3f, 0.3f));
@@ -45,7 +63,7 @@ public class GuiMinimap extends GuiFrame {
         setPauseGame(false);
         setNeedsCssReload(true);
 
-        this.viewport = new Viewport((float) (mc.player.posX - 40), (float) (mc.player.posZ - 40), 80, 80);
+        this.viewport = new Viewport((float) (mc.player.posX - 60), (float) (mc.player.posZ - 60), 120, 120);
 
         final GuiPanel pane = new GuiPanel();
         pane.setCssId("container");
@@ -53,14 +71,123 @@ public class GuiMinimap extends GuiFrame {
         mapPane.setCssId("map_pane");
         pane.add(mapPane);
         add(pane);
-        mapPane.add(myPos = (GuiLabel) new GuiLabel("V").setCssId("custom_marker").setCssClass("waypoint"));
+
+        for (EntityPlayer player : mc.world.playerEntities) {
+            boolean self = player == mc.player;
+            GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + (self ? "r_arrow" : "player") + ".png"), 0, 0, 50, 50);
+            WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler((float) player.posX, (float) player.posZ, icon);
+            GuiLabel label = new GuiLabel("") {
+                @Override
+                protected void bindLayerBounds() {
+                    if (self) {
+                        GlStateManager.pushMatrix();
+                        GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
+                        GlStateManager.rotate(player.rotationYaw + 90, 0, 0, 1);
+                        GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
+                    }
+                }
+
+                @Override
+                protected void unbindLayerBounds() {
+                    if (self) {
+                        GlStateManager.popMatrix();
+                    }
+                }
+            };
+            mapPane.add(label.setHoveringText(Collections.singletonList(self ? I18n.format("gui.map.you") : player.getDisplayNameString())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
+            playerPosCache.put(player, new EntityPosCache(player, label, pos));
+        }
+        refreshGpsNodeComponents();
+        refreshCustomMarker();
+    }
+
+    public void refreshGpsNodeComponents() {
+        Map<GpsNode, GuiComponent<?>> newGpsNodeComponents = new HashMap<>();
+        GuiTextureSprite icon = null;
+        for (GpsNode node : GpsNodes.getInstance().getNodes()) {
+            if (node instanceof WaypointNode) {
+                if (gpsNodeComponents.containsKey(node)) {
+                    mapPane.remove(gpsNodeComponents.get(node));
+                }
+                GuiComponent<?> label = new GuiLabel("") {
+                    @Override
+                    protected void bindLayerBounds() {
+                        boolean visible = getRenderMinX() > GuiMinimap.this.getRenderMinX() && getRenderMaxX() < GuiMinimap.this.getRenderMaxX() && getRenderMinY() > GuiMinimap.this.getRenderMinY() && getRenderMaxY() < GuiMinimap.this.getRenderMaxY();
+                        if (!visible)
+                            return;
+                        GlStateManager.pushMatrix();
+                        GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
+                        GlStateManager.rotate(180 + mc.player.rotationYaw, 0, 0, 1);
+                        GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
+                    }
+
+                    @Override
+                    protected void unbindLayerBounds() {
+                        boolean visible = getRenderMinX() > GuiMinimap.this.getRenderMinX() && getRenderMaxX() < GuiMinimap.this.getRenderMaxX() && getRenderMinY() > GuiMinimap.this.getRenderMinY() && getRenderMaxY() < GuiMinimap.this.getRenderMaxY();
+                        if (!visible)
+                            return;
+                        GlStateManager.popMatrix();
+                    }
+                }.setCssId("gps_node").setCssClass("waypoint");
+                int size = ((WaypointNode) node).getIcon().equals("store") ? 256 : 50;
+                icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + ((WaypointNode) node).getIcon() + ".png"), 0, 0, size, size);
+                WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(node.getPosition().x, node.getPosition().z, icon);
+                label.getStyle().addAutoStyleHandler(position);
+                mapPane.add(label);
+                newGpsNodeComponents.put(node, label);
+            }
+        }
+        gpsNodeComponents.forEach((node, component) -> {
+            if (!newGpsNodeComponents.containsKey(node)) {
+                mapPane.remove(component);
+            }
+        });
+        gpsNodeComponents.clear();
+        gpsNodeComponents.putAll(newGpsNodeComponents);
+    }
+
+    public void refreshCustomMarker() {
+        if (customMarkerComponent != null) {
+            mapPane.remove(customMarkerComponent);
+            customMarkerComponent = null;
+        }
+        WaypointNode customMarker = ClientEventHandler.gpsNavigator.getCustomWaypoint();
+        if (customMarker == null) {
+            return;
+        }
+        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, 50, 50);
+        GuiComponent<?> label = new GuiLabel("") {
+            @Override
+            protected void bindLayerBounds() {
+                boolean visible = getRenderMinX() > GuiMinimap.this.getRenderMinX() && getRenderMaxX() < GuiMinimap.this.getRenderMaxX() && getRenderMinY() > GuiMinimap.this.getRenderMinY() && getRenderMaxY() < GuiMinimap.this.getRenderMaxY();
+                if (!visible)
+                    return;
+                GlStateManager.pushMatrix();
+                GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
+                GlStateManager.rotate(180 + mc.player.rotationYaw, 0, 0, 1);
+                GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
+            }
+
+            @Override
+            protected void unbindLayerBounds() {
+                boolean visible = getRenderMinX() > GuiMinimap.this.getRenderMinX() && getRenderMaxX() < GuiMinimap.this.getRenderMaxX() && getRenderMinY() > GuiMinimap.this.getRenderMinY() && getRenderMaxY() < GuiMinimap.this.getRenderMaxY();
+                if (!visible)
+                    return;
+                GlStateManager.popMatrix();
+            }
+        }.setCssId("gps_node").setCssClass("waypoint");
+        label.setHoveringText(Collections.singletonList(customMarker.getName()));
+        WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(customMarker.getPosition().x, customMarker.getPosition().z, icon);
+        label.getStyle().addAutoStyleHandler(position);
+        customMarkerComponent = label;
+        mapPane.add(label);
     }
 
     private void updateViewport(Viewport newViewport) {
         if (/*newViewport.width > 5000 || newViewport.height > 7000 || */newViewport.width < 50 || newViewport.height < 50)
             //DRAWLIFE if(newViewport.x < 6144 || newViewport.width+newViewport.x > 15232 || newViewport.y < 4512 || newViewport.height+newViewport.y > 13696 || newViewport.width < 50 || newViewport.height < 50)
             return;
-        if (newViewport.width > 160 || newViewport.height > 160)
+        if (newViewport.width > 300 || newViewport.height > 300)
             return;
         if (mapPane.getWidth() == 0 || mapPane.getHeight() == 0) {
             System.out.println("Escaping from 0-world");
@@ -99,28 +226,26 @@ public class GuiMinimap extends GuiFrame {
         for (int dx = bx - dw; dx < bx + mapPane.getWidth() + dw; dx = dx + dw) {
             int z = (int) (newViewport.y - (uy % 400) - 400);
             for (int dy = by - dh; dy < by + mapPane.getHeight() + dh; dy = dy + dh) {
-                PartPos pos = new PartPos(x / 400, z / 400);
-                MapPartClient part = (MapPartClient) mapContainer.requestTile(x, z, mc.world, mc.player);
+                int x2 = x;
+                int z2 = z;
+                if (x2 < 0)
+                    x2 -= 399;
+                if (z2 < 0)
+                    z2 -= 399;
+                PartPos pos = new PartPos(x2 / 400, z2 / 400);
+                MapPartClient part = (MapPartClient) mapContainer.requestTile(x2, z2, mc.world, mc.player);
                 part.refreshMapContents();
                 int finalDx = dx;
                 int finalDy = dy;
 
                 GuiPanel partPane = partsStore.get(pos);
                 if (partPane == null) {
-                    partPane = (GuiPanel) new GuiPanel().getStyle()
-                            //TODO CHANGE WHEN FIXED IN ACSGUIS
-                            .setTexture(new GuiTextureSprite(part.getLocation(), 0, 0, 400, 400) {
-                                @Override
-                                public void drawSprite(int x, int y, int spriteWidth, int spriteHeight, int uOffset, int vOffset, int textureWidth, int textureHeight, int width, int height) {
-                                    //That fdp is loading the texture himself, we don't want that !! (TODO change in ACsGuis)
-                                    Minecraft.getMinecraft().renderEngine.bindTexture(part.getLocation());
-                                    Gui.drawScaledCustomSizeModalRect(x, y,
-                                            0 + uOffset, 0 + vOffset,
-                                            (int) Math.ceil(textureWidth * 1), (int) Math.ceil(textureHeight * 1),
-                                            (int) Math.ceil(spriteWidth * 1), (int) Math.ceil(spriteHeight * 1),
-                                            400, 400);
-                                }
-                            }).getOwner();
+                    partPane = (GuiPanel) new GuiPanel() {
+                        @Override
+                        protected void bindLayerBounds() {
+                        }
+                    }.getStyle()
+                            .setTexture(new GuiTextureSprite(part.getLocation(), 0, 0, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE)).getOwner();
                     partsStore.put(pos, partPane);
                     mapPane.add(partPane);
                 } else {
@@ -160,83 +285,162 @@ public class GuiMinimap extends GuiFrame {
         }
         oldPoses.stream().map(partsStore::remove).forEach(mapPane::remove);
 
-        //====================== Waypoints ======================
-        //TODO DON'T RECREATE COMPONENTS
-        /*for (final MapApp.MapWaypoint w : MapApp.waypoints) {
-            GuiLabel label = new GuiLabel(w.getIcon()) {
-                @Override
-                public void drawForeground(int mouseX, int mouseY, float partialTicks) {
-                    super.drawForeground(mouseX, mouseY, partialTicks);
-                    GL11.glDisable(GL11.GL_SCISSOR_TEST);
-                    if (this.isHovered()) {
-                        GuiAPIClientHelper.drawHoveringText(Arrays.asList(w.getLabel()), mouseX, mouseY);
-                        //GlStateManager.disableDepth();
-                        //GlStateManager.enableLighting();
-                        RenderHelper.disableStandardItemLighting();
-                    }
-                    GL11.glEnable(GL11.GL_SCISSOR_TEST);
-                }
-            };
-            label.setCssClass("waypoint");
-            label.getStyle().addAutoStyleHandler(new AutoStyleHandler<ComponentStyleManager>() {
-                @Override
-                public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
-                    if (property == EnumCssStyleProperties.COLOR) {
-                        csm.setForegroundColor(w.getColor());
-                        return true;
-                    }
-                    if (property == EnumCssStyleProperties.LEFT) {
-                        csm.getXPos().setRelative(w.getX() - newViewport.x, CssValue.Unit.RELATIVE_INT);
-                        return true;
-                    }
-                    if (property == EnumCssStyleProperties.TOP) {
-                        csm.getYPos().setRelative(w.getY() - newViewport.y, CssValue.Unit.RELATIVE_INT);
-                        return true;
-                    }
-                    return false;
-                }
-
-                @Override
-                public Collection<EnumCssStyleProperties> getModifiedProperties(ComponentStyleManager componentStyleManager) {
-                    return Arrays.asList(EnumCssStyleProperties.COLOR, EnumCssStyleProperties.LEFT, EnumCssStyleProperties.TOP);
-                }
-            });
-            mapPane.add(label);
-        }
-        if (MapApp.customPoint != null) {//TODO UPDATE SYSTEM
-            mapPane.add(MapApp.customPoint);
-        }*/
-
         //====================== Geo localisation ======================
-        //TODO
-
-        myPos.getStyle().getAutoStyleHandlers().clear();
-        myPos.getStyle().addAutoStyleHandler(new AutoStyleHandler<ComponentStyleManager>() {
-            @Override
-            public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
-                if (property == EnumCssStyleProperties.LEFT) {
-                    csm.getXPos().setAbsolute((playerX - newViewport.x) * mapPane.getWidth() / newViewport.width - 4);
-                    return true;
+        if (playerPosCache.size() != mc.world.playerEntities.size()) {
+            playerPosCache.entrySet().removeIf(p -> {
+                boolean remove = !mc.world.playerEntities.contains(p.getKey());
+                if (remove) {
+                    mapPane.remove(p.getValue().component);
                 }
-                if (property == EnumCssStyleProperties.TOP) {
-                    csm.getYPos().setAbsolute((playerZ - newViewport.y) * mapPane.getHeight() / newViewport.height - 4);
-                    return true;
+                return remove;
+            });
+            for (EntityPlayer player : mc.world.playerEntities) {
+                if (!playerPosCache.containsKey(player)) {
+                    GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_player.png"), 0, 0, 50, 50);
+                    WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler((float) player.posX, (float) player.posZ, icon);
+                    GuiLabel label = new GuiLabel("") {
+                        @Override
+                        protected void bindLayerBounds() {
+                        }
+                    };
+                    mapPane.add(label.setHoveringText(Collections.singletonList(player.getDisplayNameString())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
+                    playerPosCache.put(player, new EntityPosCache(player, label, pos));
                 }
-                return false;
             }
-
-            @Override
-            public Collection<EnumCssStyleProperties> getModifiedProperties(ComponentStyleManager componentStyleManager) {
-                return Arrays.asList(EnumCssStyleProperties.LEFT, EnumCssStyleProperties.TOP);
-            }
-        });
+        }
+        for (EntityPosCache posCache : playerPosCache.values()) {
+            posCache.update();
+        }
 
         viewport = newViewport;
+        //TODO ONLY REFRESH POSITIONS
         mapPane.getStyle().refreshCss(false, "viewport_upd");
     }
 
     @Override
     public void drawForeground(int mouseX, int mouseY, float partialTicks) {
+        GlStateManager.disableTexture2D();
+        GL11.glEnable(GL_SCISSOR_TEST);
+        GuiAPIClientHelper.glScissor(mapPane.getScreenX(), mapPane.getScreenY(), mapPane.getWidth(), mapPane.getHeight());
+        GlStateManager.color(87f / 255, 0, 127f / 255, 1);
+        GpsNavigator nav = ClientEventHandler.gpsNavigator;
+        if (nav.getRoute() != null) {
+            Queue<GpsNode> copy = new LinkedList<>(nav.getRoute());
+            GpsNode first = copy.poll(), second = null;
+            while ((second = copy.poll()) != null) {
+                float width = 5;
+                // if (!viewport.contains(first.getPosition().x, first.getPosition().z) && !viewport.contains(second.getPosition().x, second.getPosition().z))
+                //    continue;
+                if (first.getBezierCurves().containsKey(second.getId())) {
+                    BezierCurveLink link = first.getBezierCurves().get(second.getId());
+                    List<Vector2f> points = link.getRenderPoints();
+                    // GlStateManager.glLineWidth(10);
+                    //GlStateManager.glBegin(GL11.GL_LINE_STRIP);
+                    for (int i = 0; i < points.size() - 1; i++) {
+                        Vector2f point1 = points.get(i);
+                        Vector2f point2 = points.get(i + 1);
+                        float startX = mapPane.getScreenX() + (point1.x - viewport.x) * mapPane.getWidth() / viewport.width;
+                        float startY = mapPane.getScreenY() + (point1.y - viewport.y) * mapPane.getHeight() / viewport.height;
+                        float endX = mapPane.getScreenX() + (point2.x - viewport.x) * mapPane.getWidth() / viewport.width;
+                        float endY = mapPane.getScreenY() + (point2.y - viewport.y) * mapPane.getHeight() / viewport.height;
+                        //GlStateManager.glVertex3f(startX, startY, 5);
+                        //GlStateManager.glVertex3f(endX, endY, 5);                    //Draw fat line
+                        float x1 = startX;
+                        float y1 = startY;
+                        float x2 = endX;
+                        float y2 = endY;
+                        float dx = x2 - x1;
+                        float dy = y2 - y1;
+                        float length = (float) Math.sqrt(dx * dx + dy * dy);
+                        float nx = dy / length; // Normal x
+                        float ny = -dx / length; // Normal y
+                        // Adjust normals based on line width
+                        nx *= width / 2.0f;
+                        ny *= width / 2.0f;
+                        // Begin drawing triangles
+                        GlStateManager.glBegin(GL_TRIANGLE_FAN);
+                        // First triangle
+                        GL11.glVertex3f(x1 - nx, y1 - ny, 5.0f);
+                        GL11.glVertex3f(x2 + nx, y2 + ny, 5.0f);
+                        GL11.glVertex3f(x1 + nx, y1 + ny, 5.0f);
+                        // Second triangle
+                        GL11.glVertex3f(x1 - nx, y1 - ny, 5.0f);
+                        GL11.glVertex3f(x2 - nx, y2 - ny, 5.0f);
+                        GL11.glVertex3f(x2 + nx, y2 + ny, 5.0f);
+                        // End drawing
+                        //GL11.glEnd();
+
+                        int J;
+                        int triangleAmount = 20; //# of triangles used to draw circle
+                        //In radians
+                        float twicePi = (float) (2.0f * Math.PI);
+                        float x = endX;
+                        float y = endY;
+                        float radius = 2.5f;
+                        GlStateManager.glVertex3f((float) x, (float) y, 0); // center of circle
+                        for (J = 0; J <= triangleAmount; J++) {
+                            GlStateManager.glVertex3f(
+                                    (float) (x + (radius * Math.sin(0 + (float) J * twicePi / (float) triangleAmount))),
+                                    (float) (y + (radius * Math.cos(0 + (float) J * twicePi / (float) triangleAmount))), 0
+                            );
+                        }
+                        GlStateManager.glEnd();
+                    }
+                    //GlStateManager.glEnd();
+                    //GlStateManager.glLineWidth(1);
+                } else {
+                    float startX = (first.getPosition().x - GuiMinimap.this.viewport.x) * GuiMinimap.this.mapPane.getWidth() / GuiMinimap.this.viewport.width + mapPane.getScreenX();
+                    float startY = (first.getPosition().z - GuiMinimap.this.viewport.y) * GuiMinimap.this.mapPane.getHeight() / GuiMinimap.this.viewport.height + mapPane.getScreenY();
+                    float endX = (second.getPosition().x - GuiMinimap.this.viewport.x) * GuiMinimap.this.mapPane.getWidth() / GuiMinimap.this.viewport.width + mapPane.getScreenX();
+                    float endY = (second.getPosition().z - GuiMinimap.this.viewport.y) * GuiMinimap.this.mapPane.getHeight() / GuiMinimap.this.viewport.height + mapPane.getScreenY();
+                    //Draw fat line
+                    float x1 = startX;
+                    float y1 = startY;
+                    float x2 = endX;
+                    float y2 = endY;
+                    float dx = x2 - x1;
+                    float dy = y2 - y1;
+                    float length = (float) Math.sqrt(dx * dx + dy * dy);
+                    float nx = dy / length; // Normal x
+                    float ny = -dx / length; // Normal y
+                    // Adjust normals based on line width
+                    nx *= width / 2.0f;
+                    ny *= width / 2.0f;
+                    // Begin drawing triangles
+                    GlStateManager.glBegin(GL_TRIANGLE_FAN);
+                    // First triangle
+                    GL11.glVertex3f(x1 - nx, y1 - ny, 5.0f);
+                    GL11.glVertex3f(x2 + nx, y2 + ny, 5.0f);
+                    GL11.glVertex3f(x1 + nx, y1 + ny, 5.0f);
+                    // Second triangle
+                    GL11.glVertex3f(x1 - nx, y1 - ny, 5.0f);
+                    GL11.glVertex3f(x2 - nx, y2 - ny, 5.0f);
+                    GL11.glVertex3f(x2 + nx, y2 + ny, 5.0f);
+                    // End drawing
+                    //GL11.glEnd();
+
+                    int i;
+                    int triangleAmount = 20; //# of triangles used to draw circle
+                    //In radians
+                    float twicePi = (float) (2.0f * Math.PI);
+                    float x = endX;
+                    float y = endY;
+                    float radius = 2.5f;
+                    GlStateManager.glVertex3f((float) x, (float) y, 0); // center of circle
+                    for (i = 0; i <= triangleAmount; i++) {
+                        GlStateManager.glVertex3f(
+                                (float) (x + (radius * Math.sin(0 + (float) i * twicePi / (float) triangleAmount))),
+                                (float) (y + (radius * Math.cos(0 + (float) i * twicePi / (float) triangleAmount))), 0
+                        );
+                    }
+                    GlStateManager.glEnd();
+                }
+                first = second;
+            }
+        }
+        GL11.glDisable(GL_SCISSOR_TEST);
+        GlStateManager.enableTexture2D();
+
         super.drawForeground(mouseX, mouseY, partialTicks);
     }
 
@@ -257,14 +461,25 @@ public class GuiMinimap extends GuiFrame {
         super.tick();
         float pX = (float) mc.player.posX;
         float pZ = (float) mc.player.posZ;
-        if (Math.abs(pX - playerX) > 0.03f || Math.abs(pZ - playerZ) > 0.03f) {
-            updateViewport(new Viewport(pX - viewport.width / 2, pZ - viewport.height / 2, viewport.width, viewport.height));
+        float size = computeMapSize(mc.player);
+        boolean update = size != mapSize;
+        if (!update) {
+            update = playerPosCache.values().stream().anyMatch(EntityPosCache::hasChanged) || playerPosCache.size() != mc.world.playerEntities.size();
+        }
+        if (update) {
+            mapSize = size;
+            System.out.println("Update x " + (pX - size / 2) + " z " + (pZ - size / 2) + " size " + size);
+            updateViewport(new Viewport(pX - size / 2, pZ - size / 2, size, size));
         }
     }
 
     @AllArgsConstructor
     public static class Viewport {
         protected float x, y, width, height;
+
+        public boolean contains(float x, float z) {
+            return x >= this.x && x <= this.x + width && z >= this.y && z <= this.y + height;
+        }
     }
 
     @Override
@@ -272,6 +487,7 @@ public class GuiMinimap extends GuiFrame {
         if (!Minecraft.getMinecraft().getFramebuffer().isStencilEnabled())
             Minecraft.getMinecraft().getFramebuffer().enableStencil();
 
+        GlStateManager.pushMatrix();
         //   CircleBackground.renderBackground(0, 0, 0, resolution.getScaledWidth(), resolution.getScaledHeight(), Color.RED.getRGB());
 // Enable stencil testing
         /*glEnable(GL_STENCIL_TEST);
@@ -326,30 +542,106 @@ public class GuiMinimap extends GuiFrame {
         /* (nothing to draw) */
         // draw only where stencil's value is 1
         glStencilFunc(GL_EQUAL, 1, 0xFF);
-
         int i = GlStateManager.glGetError();
         if (i != 0) {
             String s = GLU.gluErrorString(i);
             System.out.println("GL ERROR: " + i + " " + s);
         }
-
-        //CircleBackground.renderBackground(0, 0, 0, resolution.getScaledWidth(), resolution.getScaledHeight(), Color.GREEN.getRGB());
-        //  CircleBackground.renderBackground(0, cx-radius, cy-radius, cx+radius, cy+radius, Color.YELLOW.getRGB());
+        GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
+        GlStateManager.rotate(180 - mc.player.rotationYaw, 0, 0, 1);
+        GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
     }
 
     @Override
     protected void unbindLayerBounds() {
-        // CircleBackground.renderBackground(0, 0, 0, resolution.getScaledWidth(), resolution.getScaledHeight(), Color.BLUE.getRGB());
-        float cx = 59.5f;
-        float cy = 59.5f;
-        float radius = 49.5f;
-        //CircleBackground.renderBackground(0, cx-radius, cy-radius, cx+radius, cy+radius, Color.YELLOW.getRGB());
         glDisable(GL_STENCIL_TEST);
+        GlStateManager.popMatrix();
 
         int i = GlStateManager.glGetError();
         if (i != 0) {
             String s = GLU.gluErrorString(i);
             System.out.println("GL ERROR: " + i + " " + s);
         }
+    }
+
+    @Setter
+    @AllArgsConstructor
+    public class WorldPosAutoStyleHandler implements AutoStyleHandler<ComponentStyleManager> {
+        private float posX;
+        private float posZ;
+        private GuiTextureSprite icon;
+
+        @Override
+        public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
+            if (property == EnumCssStyleProperties.LEFT) {
+                csm.getXPos().setAbsolute((posX - GuiMinimap.this.viewport.x) * GuiMinimap.this.mapPane.getWidth() / GuiMinimap.this.viewport.width - 4);
+                return true;
+            }
+            if (property == EnumCssStyleProperties.TOP) {
+                csm.getYPos().setAbsolute((posZ - GuiMinimap.this.viewport.y) * GuiMinimap.this.mapPane.getHeight() / GuiMinimap.this.viewport.height - 4);
+                return true;
+            }
+            if (property == EnumCssStyleProperties.TEXTURE && icon != null) {
+                csm.setTexture(icon);
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public Collection<EnumCssStyleProperties> getModifiedProperties(ComponentStyleManager componentStyleManager) {
+            return Arrays.asList(EnumCssStyleProperties.LEFT, EnumCssStyleProperties.TOP, EnumCssStyleProperties.TEXTURE);
+        }
+    }
+
+    @AllArgsConstructor
+    public class EntityPosCache {
+        //TODO TRACK VEHICLES
+        private final EntityPlayer player;
+        private final GuiLabel component;
+        private final WorldPosAutoStyleHandler styleHandler;
+
+        public boolean hasChanged() {
+            //  System.out.println("Checking for change " + Math.abs(styleHandler.posX - player.posX) + " " + Math.abs(styleHandler.posZ - player.posZ));
+            return Math.abs(styleHandler.posX - player.posX) > 0.05f || Math.abs(styleHandler.posZ - player.posZ) > 0.05f;
+        }
+
+        public void update() {
+            System.out.println("Updating player pos");
+            styleHandler.setPosX((float) player.posX);
+            styleHandler.setPosZ((float) player.posZ);
+        }
+    }
+
+    public float computeMapSize(EntityPlayer player) {
+        float speed;
+        if (player.isRiding()) {
+            speed = (float) (player.getRidingEntity().motionX * player.getRidingEntity().motionX + player.getRidingEntity().motionZ * player.getRidingEntity().motionZ);
+        } else {
+            speed = (float) (player.motionX * player.motionX + player.motionZ * player.motionZ);
+        }
+        float size = Math.min(250, Math.max(100, 100 + speed * 800));
+        //System.out.println("Speed: " + speed + " Size: " + size);
+        if (Math.abs(mapSize - size) > 25 || Math.abs(targetMapSize - size) > 10) {
+            if (mapSizeChangeCooldown > 0) {
+                mapSizeChangeCooldown--;
+            } else {
+                targetMapSize = size;
+                mapSizeChangeCooldown = 20;
+            }
+        } else if (targetMapSize == mapSize) {
+            mapSizeChangeCooldown = 20;
+        }
+        size = mapSize;
+        if (Math.abs(targetMapSize - mapSize) > 5) {
+            if (mapSize < targetMapSize) {
+                size += 5;
+            } else if (mapSize > targetMapSize) {
+                size -= 5;
+            }
+        } else {
+            size = targetMapSize;
+        }
+        return size;
     }
 }

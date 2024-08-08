@@ -1,0 +1,15 @@
+cmd.map.preload=Loading the whole map, this will take some time...
+cmd.map.fullload=Rendering the whole map, this will take some time...
+cmd.map.fullooad.mode2=Warning: mode 2 will delete all chunk map data, and reload it, generating new chunks if necessary. This will take some time.
+cmd.map.regionload=Rendering the map from these coordinates, this will take some time...
+cmd.map.desc.1===== RealTimeMap commands : ====
+cmd.map.desc.2=- '/gtwmap loadmap preload': load the map that has already been rendered in memory to view it more quickly, uses the coordinates from the config
+cmd.map.desc.3=- '/gtwmap loadmap full [mode]': renders the entire map (quite a long operation) except for the coordinates specified in the config
+cmd.map.desc.4=- '/gtwmap loadmap region <xmin> <zmin> <xmax> <zmax> <mode>': renders the map from the coordinates given as arguments. mode 1 : normal mode, updates incomplete chunks; mode 2 : deletes existing chunks and recreates them all
+
+gui.map.create_wp=Create a waypoint
+gui.map.confirm=Confirm
+gui.map.cancel=Cancel
+gui.map.wp_name=Waypoint name
+gui.map.title=Grand Theft Warzone Map. Right-click to set a destination.
+gui.map.you=You

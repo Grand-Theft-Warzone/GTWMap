@@ -1,6 +1,6 @@
 package fr.aym.gtwmap.network;
 
-import fr.aym.gtwmap.client.gui.GuiMapTest;
+import fr.aym.gtwmap.client.gui.GuiBigMap;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapPart;
 import fr.aym.gtwmap.map.PartPos;
@@ -51,7 +51,7 @@ public class CS18PacketMapPart implements IMessage {
                 int z = message.pos.zOrig * GtwMapConstants.TILE_SIZE;
                 MapContainer.getInstance(true).requestTile(x, z, Minecraft.getMinecraft().world, null).feedWidthBlockData(message.blockData);
             });
-            GuiMapTest.loadingTiles = message.currentlyLoading;
+            GuiBigMap.loadingTiles = message.currentlyLoading;
             return null;
         }
     }

@@ -33,6 +33,8 @@
     color: auto;
 
     z-index: 20;
+
+    background-image: auto;
 }
 
 #custom_marker {
