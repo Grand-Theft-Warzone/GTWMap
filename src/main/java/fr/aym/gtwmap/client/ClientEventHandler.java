@@ -1,10 +1,13 @@
 package fr.aym.gtwmap.client;
 
 import fr.aym.acsguis.api.ACsGuiApi;
+import fr.aym.gtwmap.api.GtwMapApi;
+import fr.aym.gtwmap.api.ITrackableObject;
 import fr.aym.gtwmap.client.gps.GpsNavigator;
 import fr.aym.gtwmap.client.gui.GuiBigMap;
 import fr.aym.gtwmap.client.gui.GuiMinimap;
 import net.minecraft.client.Minecraft;
+import net.minecraft.entity.passive.EntityPig;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
@@ -22,10 +25,10 @@ public class ClientEventHandler {
     @SubscribeEvent
     public void onKeyTyped(InputEvent.KeyInputEvent event) {
         if (MC.world != null) {
-            if (Keyboard.isKeyDown(Keyboard.KEY_O)) { // Vraie map dynamique
+            if (Keyboard.isKeyDown(Keyboard.KEY_O)) {
                 ACsGuiApi.asyncLoadThenShowGui("client_map", () -> new GuiBigMap(false));
             }
-            if (Keyboard.isKeyDown(Keyboard.KEY_P)) { // Vraie mini-map dynamique
+            if (Keyboard.isKeyDown(Keyboard.KEY_P)) {
                 if (ACsGuiApi.getDisplayHudGui() != null) {
                     ACsGuiApi.closeHudGui();
                 } else {
@@ -42,8 +45,18 @@ public class ClientEventHandler {
     public void clientConnected(EntityJoinWorldEvent event) {
         if (event.getEntity() == MC.player) {
             gpsNavigator.clear();
+            GtwMapApi.getTrackedObjects().clear();
             ACsGuiApi.asyncLoadThenShowHudGui("minimap", GuiMinimap::new);
         }
+        /*if (event.getEntity() instanceof EntityPig && event.getEntity().world.isRemote) {
+            System.out.println("Adding pig on map " + event.getEntity()+ " "+event.getEntity().hashCode());
+            GtwMapApi.addTrackedObject(new ITrackableObject.TrackedEntity(event.getEntity(), "Police", "player_white") {
+                @Override
+                public int renderPoliceCircleAroundRadius() {
+                    return 30;
+                }
+            });
+        }*/
     }
 
     @SubscribeEvent

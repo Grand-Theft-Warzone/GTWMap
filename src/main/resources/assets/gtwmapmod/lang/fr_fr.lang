@@ -1,11 +1,16 @@
 cmd.map.preload=Chargement de toute la carte, cela prendra un certain temps...
 cmd.map.fullload=Rendu de toute la carte, cela prendra un certain temps...
-cmd.map.fullooad.mode2=Attention : le mode 2 supprimera toutes les données de la carte des chunks, et les rechargera, générant de nouveaux chunks si nécessaire. Cela prendra un certain temps.
+cmd.map.fullooad.mode3=Attention : le mode 3 supprimera toutes les données de la carte des chunks, et les rechargera, générant de nouveaux chunks si nécessaire. Cela prendra un certain temps.
+cmd.map.fullooad.force=Attention : forçage du rendu, même si un rendu est déjà en cours !
 cmd.map.regionload=Rendu de la carte à partir de ces coordonnées, cela prendra un certain temps...
 cmd.map.desc.1===== Commandes carte en temps réel : ====
 cmd.map.desc.2=- '/gtwmap loadmap preload' : charge la carte qui a déjà été rendue dans la mémoire afin de de la visualiser plus rapidement, utilise les coordinnées de la config
-cmd.map.desc.3=- '/gtwmap loadmap full [mode]' : réalise le rendu de toute la carte (opération assez longue) à part des coordonnées spécifiées dans la config
-cmd.map.desc.4=- '/gtwmap loadmap region <xmin> <zmin> <xmax> <zmax> <mode>' : réalise le rendu de la carte à partir des coordonnées données en argument. mode 1 : mode normal, met à jour les chunks incomplets; mode 2 : supprime les chunks existants et les recréée tout
+cmd.map.desc.3=- '/gtwmap loadmap full [mode] [force]' : réalise le rendu de toute la carte (opération assez longue) à part des coordonnées spécifiées dans la config
+cmd.map.desc.4=- '/gtwmap loadmap region <xmin> <zmin> <xmax> <zmax> <mode> [force]' : réalise le rendu de la carte à partir des coordonnées données en argument. mode 1 : mode normal, met à jour les chunks incomplets, ne génère pas de chunks de carte Minecraft ; mode 2 : met à jour les chunks incomplets en générant ceux qui manquent ; mode 3 : supprime les chunks existants et les recrée tous
+
+gtwmap.load.start=%s map parts are loading...
+gtwmap.load.already_loading=§cErreur : un rendu est déjà en cours d'éxécution ! Vous pouvez forcer le rendu en ajouter "force" à la fin de la commande.
+gtwmap.load.end=Opération terminée !
 
 gui.map.create_wp=Créer un point de passage
 gui.map.confirm=Confirmer

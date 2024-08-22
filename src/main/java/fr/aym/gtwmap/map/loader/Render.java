@@ -1,4 +1,4 @@
-package fr.aym.gtwmap.map;
+package fr.aym.gtwmap.map.loader;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;

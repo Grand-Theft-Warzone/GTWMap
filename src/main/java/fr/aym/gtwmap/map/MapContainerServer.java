@@ -1,12 +1,15 @@
 package fr.aym.gtwmap.map;
 
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.map.loader.EnumLoadMode;
+import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.network.CS18PacketMapPart;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.Getter;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 
 import javax.annotation.Nullable;
@@ -105,7 +108,7 @@ public class MapContainerServer extends MapContainer {
         }
         MapPart part = requestDirect(pos);
         CompletableFuture<MapPart> future = new CompletableFuture<>();
-        if(part != null) {
+        if (part != null) {
             part.refreshMapContents();
             future.complete(part);
             return future;
@@ -127,16 +130,17 @@ public class MapContainerServer extends MapContainer {
             }
         }
         pendingUpdates.clear();
+        MapLoader.getInstance().updateChunkLoading();
         if (MapLoader.getInstance().getLoadingParts().isEmpty() && getLoadQueue().isEmpty()) {
-            if (MapLoader.godMode != 0) {
+            if (MapLoader.godMode.get() != EnumLoadMode.LOAD_FROM_FILE) {
                 System.out.println("Render end !");
-                MapLoader.godMode = 0;
+                MapLoader.godMode.set(EnumLoadMode.LOAD_FROM_FILE);
             }
             if (MapLoader.listener != null) {
-                MapLoader.listener.sendMessage(new TextComponentString("Opération terminée !"));
+                MapLoader.listener.sendMessage(new TextComponentTranslation("gtwmap.load.end"));
                 MapLoader.listener = null;
             }
-            MapLoader.amountToLoad = 0;
+            MapLoader.amountToLoad.set(0);
         }
     }
 
@@ -160,7 +164,7 @@ public class MapContainerServer extends MapContainer {
 
     public void onContentsChange(MapPart part) {
         PartPos t = part.getPos();
-        System.out.println("Contents change " + t + " " + requests.containsKey(t) + " " + requests);
+        // System.out.println("Contents change " + t + " " + requests.containsKey(t) + " " + requests);
         if (requests.containsKey(t)) {
             Set<EntityPlayerMP> list;
             if (!pendingUpdates.containsKey(t)) {
@@ -170,7 +174,7 @@ public class MapContainerServer extends MapContainer {
                 list = pendingUpdates.get(t);
             }
             list.addAll(requests.get(t));
-            System.out.println("Pending updates are now " + pendingUpdates);
+            //  System.out.println("Pending updates are now " + pendingUpdates);
         }
     }
 }

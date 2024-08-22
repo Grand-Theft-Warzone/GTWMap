@@ -10,7 +10,7 @@ import fr.aym.gtwmap.client.gui.GuiMinimap;
 import fr.aym.gtwmap.common.CommonProxy;
 import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapContainerServer;
-import fr.aym.gtwmap.map.MapLoader;
+import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.network.BBMessageGpsNodes;
 import fr.aym.gtwmap.network.CS18PacketMapPart;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
@@ -22,9 +22,13 @@ import io.netty.buffer.ByteBuf;
 import lombok.Getter;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
-import net.minecraftforge.fml.common.event.*;
+import net.minecraftforge.fml.common.event.FMLLoadCompleteEvent;
+import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
@@ -48,11 +52,13 @@ public class GtwMapMod {
     @SidedProxy(serverSide = "fr.aym.gtwmap.server.ServerProxy", clientSide = "fr.aym.gtwmap.client.ClientProxy")
     public static CommonProxy proxy;
 
-    public static final Logger log = LogManager.getLogger("GtwNpcMod");
+    public static final Logger log = LogManager.getLogger("GtwMapMod");
 
     public GtwMapMod() {
-        ACsGuiApi.registerStyleSheetToPreload(GuiBigMap.STYLE);
-        ACsGuiApi.registerStyleSheetToPreload(GuiMinimap.STYLE);
+        if (FMLCommonHandler.instance().getSide().isClient()) {
+            ACsGuiApi.registerStyleSheetToPreload(GuiBigMap.STYLE);
+            ACsGuiApi.registerStyleSheetToPreload(GuiMinimap.STYLE);
+        }
 
         NBTSerializer.addCustomSerializer(new NBTDataSerializer<Vector2f>() {
             @Override

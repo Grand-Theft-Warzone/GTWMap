@@ -1,5 +1,6 @@
 package fr.aym.gtwmap.client.gui;
 
+import fr.aym.acsguis.api.ACsGuiApi;
 import fr.aym.acsguis.api.GuiAPIClientHelper;
 import fr.aym.acsguis.component.GuiComponent;
 import fr.aym.acsguis.component.layout.GuiScaler;
@@ -15,6 +16,8 @@ import fr.aym.acsguis.event.listeners.mouse.IMouseExtraClickListener;
 import fr.aym.acsguis.event.listeners.mouse.IMouseMoveListener;
 import fr.aym.acsguis.utils.GuiTextureSprite;
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.api.GtwMapApi;
+import fr.aym.gtwmap.api.ITrackableObject;
 import fr.aym.gtwmap.client.ClientEventHandler;
 import fr.aym.gtwmap.client.gps.GpsNavigator;
 import fr.aym.gtwmap.common.gps.BezierCurveLink;
@@ -59,9 +62,10 @@ public class GuiBigMap extends GuiFrame {
     public int mouseClickX = 0, mouseClickY = 0;
     private EditMode editMode = EditMode.VIEW;
 
-    private GuiPanel mapPane;
+    private final GuiPanel mapPane;
     private final Map<PartPos, GuiPanel> partsStore = new HashMap<>();
-    private final Map<EntityPlayer, PlayerPosCache> playerPosCache = new HashMap<>();
+    private final Map<EntityPlayer, ITrackableObject<?>> trackedPlayers = new HashMap<>();
+    private final Map<ITrackableObject<?>, EntityPosCache> tackedObjectsPosCache = new HashMap<>();
 
     private GpsNode selectedNode;
     private final BezierCurveLink selectedLink = new BezierCurveLink();
@@ -103,7 +107,7 @@ public class GuiBigMap extends GuiFrame {
             @Override
             public void onMouseMoved(int mouseX, int mouseY) {
                 if (mouseClickX != 0 && (mouseX != mouseClickX || mouseY != mouseClickY)) {
-                    updateViewport(new GuiMinimap.Viewport(viewport.x - (mouseX - mouseClickX) / 1, viewport.y - (mouseY - mouseClickY) / 1, viewport.width, viewport.height));
+                    updateViewport(new GuiMinimap.Viewport(viewport.x - (mouseX - mouseClickX), viewport.y - (mouseY - mouseClickY), viewport.width, viewport.height));
                     mouseClickX = mouseX;
                     mouseClickY = mouseY;
                 }
@@ -151,44 +155,33 @@ public class GuiBigMap extends GuiFrame {
                 return;
             }
 
-            //double oldW = pane.getxSlider().getValue(), oldH = pane.getySlider().getValue();
+            float worldMouseXBeforeZoom = viewport.x + (mouseX - mapPane.getRenderMinX()) * viewport.width / (mapPane.getWidth() == 0 ? 1 : mapPane.getWidth());
+            float worldMouseYBeforeZoom = viewport.y + (mouseY - mapPane.getRenderMinY()) * viewport.height / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight());
             float amount = dWheel / 60;
-            //System.out.println("From amount " + amount + " " + ((float)(amount*-1/4/100)) + " " + ((float)(amount/4)));
             if (dWheel > 0)
-                amount = MathHelper.clamp((float) (amount / 4), 1.111111F, 10);
+                amount = MathHelper.clamp(amount / 4, 1.111111F, 10);
             else
-                amount = MathHelper.clamp((float) (amount * -1 / 2.5F), 0, 0.999999F);
-            updateViewport(new GuiMinimap.Viewport(viewport.x, viewport.y, (int) (viewport.width * amount), (int) (viewport.height * amount)));
-            //System.out.println(dWheel + " " + amount);
+                amount = MathHelper.clamp(amount * -1 / 2.5F, 0, 0.999999F);
+            float newWidth = viewport.width * amount;
+            float newHeight = viewport.height * amount;
+
+            float worldMouseXAfterZoom = viewport.x + (mouseX - mapPane.getRenderMinX()) * newWidth / (mapPane.getWidth() == 0 ? 1 : mapPane.getWidth());
+            float worldMouseYAfterZoom = viewport.y + (mouseY - mapPane.getRenderMinY()) * newHeight / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight());
+            float newViewportX = viewport.x + (worldMouseXBeforeZoom - worldMouseXAfterZoom);
+            float newViewportY = viewport.y + (worldMouseYBeforeZoom - worldMouseYAfterZoom);
+            updateViewport(new GuiMinimap.Viewport(newViewportX, newViewportY, newWidth, newHeight));
         });
 
         add(new GuiLabel(2, 2, getWidth() - 4, 20, I18n.format("gui.map.title")).setCssId("title"));
         for (EntityPlayer player : mc.world.playerEntities) {
             boolean self = player == mc.player;
-            GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + (self ? "r_arrow" : "player") + ".png"), 0, 0, 50, 50);
-            WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler((float) player.posX, (float) player.posZ, icon);
-            GuiLabel label = new GuiLabel("") {
-                @Override
-                protected void bindLayerBounds() {
-                    if (self) {
-                        GlStateManager.pushMatrix();
-                        GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
-                        GlStateManager.rotate(player.rotationYaw + 90, 0, 0, 1);
-                        GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
-                    }
-                }
-
-                @Override
-                protected void unbindLayerBounds() {
-                    if (self) {
-                        GlStateManager.popMatrix();
-                    }
-                }
-            };
-            mapPane.add(label.setHoveringText(Collections.singletonList(self ? I18n.format("gui.map.you") : player.getDisplayNameString())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
-            playerPosCache.put(player, new PlayerPosCache(player, label, pos));
+            ITrackableObject<?> trackedObject = new ITrackableObject.TrackedEntity(player, self ? I18n.format("gui.map.you") : player.getDisplayNameString(), self ? "r_arrow_white" : "player_white");
+            trackedPlayers.put(player, trackedObject);
+            makeTrackedPoint(trackedObject, self);
         }
-
+        for (ITrackableObject object : GtwMapApi.getTrackedObjects()) {
+            makeTrackedPoint(object, false);
+        }
         refreshGpsNodeComponents();
         refreshCustomMarker();
     }
@@ -196,7 +189,7 @@ public class GuiBigMap extends GuiFrame {
     private void addGpsNodeComponent(Map<GpsNode, GuiComponent<?>> gpsNodeComponents, GpsNode node) {
         GuiTextureSprite icon = null;
         if (node instanceof WaypointNode) {
-            int size = ((WaypointNode) node).getIcon().equals("store") ? 256 : 50;
+            int size = ((WaypointNode) node).getIcon().contains("gun") || ((WaypointNode) node).getIcon().contains("bank") || ((WaypointNode) node).getIcon().contains("car") || ((WaypointNode) node).getIcon().contains("r_arrow") ? 50 : 512;
             icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + ((WaypointNode) node).getIcon() + ".png"), 0, 0, size, size);
         }
         GuiComponent<?> label = new GuiLabel(icon != null ? "" : "N").setCssId("gps_node").setCssClass("waypoint");
@@ -245,7 +238,8 @@ public class GuiBigMap extends GuiFrame {
         if (customMarker == null) {
             return;
         }
-        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, 50, 50);
+        int size = customMarker.getIcon().contains("gun") || customMarker.getIcon().contains("bank") || customMarker.getIcon().contains("car") || customMarker.getIcon().contains("r_arrow") ? 50 : 512;
+        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, size, size);
         GuiComponent<?> label = new GuiLabel("").setCssId("gps_node").setCssClass("waypoint");
         label.setHoveringText(Collections.singletonList(customMarker.getName()));
         WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(customMarker.getPosition().x, customMarker.getPosition().z, icon);
@@ -501,35 +495,61 @@ public class GuiBigMap extends GuiFrame {
         oldPoses.stream().map(partsStore::remove).forEach(mapPane::remove);
 
         //====================== Geo localisation ======================
-        if (playerPosCache.size() != mc.world.playerEntities.size()) {
-            playerPosCache.entrySet().removeIf(p -> {
-                boolean remove = !mc.world.playerEntities.contains(p.getKey());
+        if (tackedObjectsPosCache.size() != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size())) {
+            trackedPlayers.entrySet().removeIf(p -> !mc.world.playerEntities.contains(p.getKey()));
+            tackedObjectsPosCache.entrySet().removeIf(p -> {
+                boolean remove = !trackedPlayers.containsValue(p.getKey()) && !GtwMapApi.getTrackedObjects().contains(p.getKey());
                 if (remove) {
                     mapPane.remove(p.getValue().component);
                 }
                 return remove;
             });
             for (EntityPlayer player : mc.world.playerEntities) {
-                if (!playerPosCache.containsKey(player)) {
-                    GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_player.png"), 0, 0, 50, 50);
-                    WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler((float) player.posX, (float) player.posZ, icon);
-                    GuiLabel label = new GuiLabel("") {
-                        @Override
-                        protected void bindLayerBounds() {
-                        }
-                    };
-                    mapPane.add(label.setHoveringText(Collections.singletonList(player.getDisplayNameString())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
-                    playerPosCache.put(player, new PlayerPosCache(player, label, pos));
+                if (!trackedPlayers.containsKey(player)) {
+                    ITrackableObject<?> trackedObject = new ITrackableObject.TrackedEntity(player, player.getDisplayNameString(), "player_white");
+                    trackedPlayers.put(player, trackedObject);
+                    makeTrackedPoint(trackedObject, false);
+                }
+            }
+            for (ITrackableObject<?> object : GtwMapApi.getTrackedObjects()) {
+                if (!tackedObjectsPosCache.containsKey(object)) {
+                    makeTrackedPoint(object, false);
                 }
             }
         }
-        for (PlayerPosCache posCache : playerPosCache.values()) {
+        for (EntityPosCache posCache : tackedObjectsPosCache.values()) {
             posCache.update();
         }
 
         viewport = newViewport;
         //TODO ONLY REFRESH POSITIONS
         mapPane.getStyle().refreshCss(false, "viewport_upd");
+    }
+
+    public void makeTrackedPoint(ITrackableObject<?> object, boolean rotateLabel) {
+        int size = object.getIcon().contains("gun") || object.getIcon().contains("bank") || object.getIcon().contains("car") || object.getIcon().contains("r_arrow") ? 50 : 512;
+        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + object.getIcon() + ".png"), 0, 0, size, size);
+        WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler(object.getPosX(), object.getPosZ(), icon);
+        GuiLabel label = new GuiLabel("") {
+            @Override
+            protected void bindLayerBounds() {
+                if (rotateLabel) {
+                    GlStateManager.pushMatrix();
+                    GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
+                    GlStateManager.rotate(((ITrackableObject.TrackedEntity) object).getTrackedObject().rotationYaw + 90, 0, 0, 1);
+                    GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
+                }
+            }
+
+            @Override
+            protected void unbindLayerBounds() {
+                if (rotateLabel) {
+                    GlStateManager.popMatrix();
+                }
+            }
+        };
+        mapPane.add(label.setHoveringText(Collections.singletonList(object.getDisplayName())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
+        tackedObjectsPosCache.put(object, new EntityPosCache(object, label, pos));
     }
 
     private int countx, county;
@@ -706,7 +726,7 @@ public class GuiBigMap extends GuiFrame {
                         float x = endX;
                         float y = endY;
                         float radius = 2.5f;
-                        GlStateManager.glVertex3f((float) x, (float) y, 0); // center of circle
+                        GlStateManager.glVertex3f(x, y, 0); // center of circle
                         for (j = 0; j <= triangleAmount; j++) {
                             GlStateManager.glVertex3f(
                                     (float) (x + (radius * Math.sin(0 + (float) j * twicePi / (float) triangleAmount))),
@@ -755,7 +775,7 @@ public class GuiBigMap extends GuiFrame {
                     float x = endX;
                     float y = endY;
                     float radius = 2.5f;
-                    GlStateManager.glVertex3f((float) x, (float) y, 0); // center of circle
+                    GlStateManager.glVertex3f(x, y, 0); // center of circle
                     for (i = 0; i <= triangleAmount; i++) {
                         GlStateManager.glVertex3f(
                                 (float) (x + (radius * Math.sin(0 + (float) i * twicePi / (float) triangleAmount))),
@@ -808,8 +828,10 @@ public class GuiBigMap extends GuiFrame {
     @Override
     public void guiClose() {
         super.guiClose();
-        GtwMapMod.getNetwork().sendToServer(new S19PacketMapPartQuery(Integer.MIN_VALUE, Integer.MAX_VALUE));
-        ((MapContainerClient) MapContainer.getInstance(true)).dirtyAll();
+        if (ACsGuiApi.getDisplayHudGui() == null || !(ACsGuiApi.getDisplayHudGui().getFrame() instanceof GuiMinimap)) {
+            GtwMapMod.getNetwork().sendToServer(new S19PacketMapPartQuery(Integer.MIN_VALUE, Integer.MAX_VALUE));
+            ((MapContainerClient) MapContainer.getInstance(true)).dirtyAll();
+        }
     }
 
     @Override
@@ -822,11 +844,11 @@ public class GuiBigMap extends GuiFrame {
         super.tick();
         boolean update = !viewInitialized;
         if (!update) {
-            update = playerPosCache.values().stream().anyMatch(PlayerPosCache::hasChanged) || playerPosCache.size() != mc.world.playerEntities.size();
+            update = tackedObjectsPosCache.values().stream().anyMatch(EntityPosCache::hasChanged) || tackedObjectsPosCache.size() != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size());
         }
         if (update) {
             viewInitialized = true;
-            updateViewport(new GuiMinimap.Viewport((float) (mc.player.posX - viewport.width / 2), (float) (mc.player.posZ - viewport.height / 2), viewport.width, viewport.height));
+            updateViewport(viewport);
         }
     }
 
@@ -849,11 +871,11 @@ public class GuiBigMap extends GuiFrame {
         @Override
         public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
             if (property == EnumCssStyleProperties.LEFT) {
-                csm.getXPos().setAbsolute((posX - GuiBigMap.this.viewport.x) * GuiBigMap.this.mapPane.getWidth() / GuiBigMap.this.viewport.width - 4);
+                csm.getXPos().setAbsolute((posX - GuiBigMap.this.viewport.x) * GuiBigMap.this.mapPane.getWidth() / GuiBigMap.this.viewport.width - 8);
                 return true;
             }
             if (property == EnumCssStyleProperties.TOP) {
-                csm.getYPos().setAbsolute((posZ - GuiBigMap.this.viewport.y) * GuiBigMap.this.mapPane.getHeight() / GuiBigMap.this.viewport.height - 4);
+                csm.getYPos().setAbsolute((posZ - GuiBigMap.this.viewport.y) * GuiBigMap.this.mapPane.getHeight() / GuiBigMap.this.viewport.height - 8);
                 return true;
             }
             if (property == EnumCssStyleProperties.TEXTURE && icon != null) {
@@ -870,18 +892,19 @@ public class GuiBigMap extends GuiFrame {
     }
 
     @AllArgsConstructor
-    public class PlayerPosCache {
-        private final EntityPlayer player;
+    public class EntityPosCache {
+        private final ITrackableObject<?> object;
         private final GuiLabel component;
         private final WorldPosAutoStyleHandler styleHandler;
 
         public boolean hasChanged() {
-            return Math.abs(styleHandler.posX - player.posX) > 0.03f || Math.abs(styleHandler.posZ - player.posZ) > 0.03f;
+            //  System.out.println("Checking for change " + Math.abs(styleHandler.posX - player.posX) + " " + Math.abs(styleHandler.posZ - player.posZ));
+            return Math.abs(styleHandler.posX - object.getPosX()) > 0.05f || Math.abs(styleHandler.posZ - object.getPosZ()) > 0.05f;
         }
 
         public void update() {
-            styleHandler.setPosX((float) player.posX);
-            styleHandler.setPosZ((float) player.posZ);
+            styleHandler.setPosX(object.getPosX());
+            styleHandler.setPosZ(object.getPosZ());
         }
     }
 }

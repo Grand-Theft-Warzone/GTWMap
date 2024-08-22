@@ -130,17 +130,17 @@ public class GpsNodes extends WorldSavedData implements ISerializable {
         if (event.getWorld().provider.getDimensionType() == DimensionType.OVERWORLD) {
             if (!event.getWorld().isRemote) {
                 try {
-                    instance = (GpsNodes) event.getWorld().getPerWorldStorage().getOrLoadData(GpsNodes.class, "GtwNpcCarPathNodes");
+                    instance = (GpsNodes) event.getWorld().getPerWorldStorage().getOrLoadData(GpsNodes.class, "GtwMapNodes");
                 } catch (Exception e) {
                     instance = null;
-                    GtwMapMod.log.fatal("Cannot load saved car path nodes !", e);
+                    GtwMapMod.log.fatal("Cannot load saved gps nodes !", e);
                 }
                 if (instance == null) {
-                    instance = new GpsNodes("GtwNpcCarPathNodes");
-                    event.getWorld().getPerWorldStorage().setData("GtwNpcCarPathNodes", instance);
+                    instance = new GpsNodes("GtwMapNodes");
+                    event.getWorld().getPerWorldStorage().setData("GtwMapNodes", instance);
                 }
             } else if (instance == null) {
-                instance = new GpsNodes("ClientCarPathNodes");
+                instance = new GpsNodes("ClientGtwMapNodes");
             }
         }
     }

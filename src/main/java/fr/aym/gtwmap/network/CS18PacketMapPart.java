@@ -1,5 +1,8 @@
 package fr.aym.gtwmap.network;
 
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
+import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.client.gui.GuiBigMap;
 import fr.aym.gtwmap.map.MapContainer;
 import fr.aym.gtwmap.map.MapPart;
@@ -43,15 +46,12 @@ public class CS18PacketMapPart implements IMessage {
         bu.writeInt(currentlyLoading);
     }
 
+    @SideOnly(Side.CLIENT)
     public static class Handler implements IMessageHandler<CS18PacketMapPart, IMessage> {
         @Override
+        @SideOnly(Side.CLIENT)
         public IMessage onMessage(CS18PacketMapPart message, MessageContext ctx) {
-            Minecraft.getMinecraft().addScheduledTask(() -> {
-                int x = message.pos.xOrig * GtwMapConstants.TILE_SIZE;
-                int z = message.pos.zOrig * GtwMapConstants.TILE_SIZE;
-                MapContainer.getInstance(true).requestTile(x, z, Minecraft.getMinecraft().world, null).feedWidthBlockData(message.blockData);
-            });
-            GuiBigMap.loadingTiles = message.currentlyLoading;
+            GtwMapMod.proxy.handleCS18(message.pos, message.blockData, message.currentlyLoading);
             return null;
         }
     }

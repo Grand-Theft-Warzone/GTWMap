@@ -1,6 +1,8 @@
 package fr.aym.gtwmap.map;
 
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.map.loader.MapLoader;
+import fr.aym.gtwmap.map.loader.MapPartLoadingTracker;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import lombok.Getter;
 import net.minecraft.util.math.BlockPos;
@@ -27,6 +29,8 @@ public abstract class MapPart {
     @Getter
     private State state = State.NOT_SET;
 
+    private MapPartLoadingTracker loadingTracker;
+
     protected MapPart(World world, PartPos pos, int width, int length, @Nullable int[] textureData) {
         this.world = world;
         this.pos = pos;
@@ -41,19 +45,20 @@ public abstract class MapPart {
 
     public void fillWithColor(int color) {
         Arrays.fill(mapTextureData, color);
+        loadingTracker = null;
     }
 
     public void refreshMapContents() {
-        if (!world.isRemote) {
+       /* if (!world.isRemote) {
             System.out.println("Refreshing " + this + " " + this.pos + " " + state);
-        }
+        }*/
         if (state != State.LOADED && state != State.LOADING) {
             if (world.isRemote) {
                 onContentsChange(); //Will put gray on client
                 state = State.LOADING;
                 int x = pos.xOrig * 400;
                 int z = pos.zOrig * 400;
-                System.out.println("CHANGE >>> Requesting " + this + " " + this.pos + " " + x + " " + z);
+                //System.out.println("CHANGE >>> Requesting " + this + " " + this.pos + " " + x + " " + z);
                 GtwMapMod.getNetwork().sendToServer(new S19PacketMapPartQuery(x, z));
             } else {
                 try {
@@ -93,6 +98,21 @@ public abstract class MapPart {
         }
         this.state = dirty ? State.DIRTY : State.LOADED;
         return this;
+    }
+
+    public void putColorAt(int at, int color) {
+        mapTextureData[at] = color;
+        if(loadingTracker != null) {
+            loadingTracker.setLastPut(at);
+        }
+    }
+
+    public void createLoadingTracker() {
+        loadingTracker = new MapPartLoadingTracker(this);
+    }
+
+    public MapPartLoadingTracker getLoadingTracker() {
+        return loadingTracker;
     }
 
     public enum State {

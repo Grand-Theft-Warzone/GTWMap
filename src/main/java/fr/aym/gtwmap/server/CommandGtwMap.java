@@ -1,7 +1,8 @@
 package fr.aym.gtwmap.server;
 
 import fr.aym.gtwmap.GtwMapMod;
-import fr.aym.gtwmap.map.MapLoader;
+import fr.aym.gtwmap.map.loader.EnumLoadMode;
+import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.network.SCMessageEditMap;
 import fr.aym.gtwmap.utils.Config;
 import net.minecraft.command.CommandBase;
@@ -11,7 +12,6 @@ import net.minecraft.command.WrongUsageException;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
 
 import java.util.ArrayList;
@@ -34,7 +34,6 @@ public class CommandGtwMap extends CommandBase {
         return 4;
     }
 
-    //TODO TRANSLATE
     @Override
     public void execute(MinecraftServer srv, ICommandSender sender, String[] args) throws CommandException {
         if (args.length == 1 && args[0].equalsIgnoreCase("edit")) {
@@ -43,22 +42,45 @@ public class CommandGtwMap extends CommandBase {
         } else if (args.length >= 1 && args[0].equalsIgnoreCase("loadmap")) {
             if (args.length == 2 && args[1].equalsIgnoreCase("preload")) {
                 sender.sendMessage(new TextComponentTranslation("cmd.map.preload"));
-                MapLoader.getInstance().loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], -1, sender);
+                MapLoader.getInstance().loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], EnumLoadMode.LOAD_NON_LOADED_ZONES, false, sender);
                 return;
             } else if (args.length >= 2 && args[1].equalsIgnoreCase("full")) {
                 sender.sendMessage(new TextComponentTranslation("cmd.map.fullload"));
-                int mode = 1;
-                if (args.length == 3) {
-                    mode = Integer.parseInt(args[2]);
+                EnumLoadMode mode = EnumLoadMode.LOAD_NON_LOADED_ZONES;
+                boolean force = false;
+                if (args.length >= 3) {
+                    int modeI = Integer.parseInt(args[2]);
+                    if (modeI < 0 || modeI > EnumLoadMode.values().length) {
+                        throw new WrongUsageException("Invalid mode");
+                    }
+                    mode = EnumLoadMode.values()[modeI];
+                    if (modeI == 3) {
+                        sender.sendMessage(new TextComponentTranslation("cmd.map.fullooad.mode3"));
+                    }
                 }
-                if(mode == 2) {
-                    sender.sendMessage(new TextComponentTranslation("cmd.map.fullooad.mode2"));
+                if (args.length >= 4) {
+                    force = Boolean.parseBoolean(args[3]);
+                    if (force) {
+                        sender.sendMessage(new TextComponentTranslation("cmd.map.fullooad.force"));
+                    }
                 }
-                MapLoader.getInstance().loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], mode, sender);
+                MapLoader.getInstance().loadArea(Config.mapDims[0], Config.mapDims[1], Config.mapDims[2], Config.mapDims[3], mode, force, sender);
                 return;
-            } else if (args.length == 7 && args[1].equalsIgnoreCase("region")) {
+            } else if (args.length >= 7 && args[1].equalsIgnoreCase("region")) {
                 sender.sendMessage(new TextComponentTranslation("cmd.map.regionload"));
-                MapLoader.getInstance().loadArea(Integer.parseInt(args[2]), Integer.parseInt(args[4]), Integer.parseInt(args[3]), Integer.parseInt(args[5]), Integer.parseInt(args[6]), sender);
+                boolean force = false;
+                if (args.length >= 8) {
+                    force = Boolean.parseBoolean(args[7]);
+                    if (force) {
+                        sender.sendMessage(new TextComponentTranslation("cmd.map.fullooad.force"));
+                    }
+                }
+                int modeI = Integer.parseInt(args[6]);
+                if (modeI < 0 || modeI > EnumLoadMode.values().length) {
+                    throw new WrongUsageException("Invalid mode");
+                }
+                EnumLoadMode mode = EnumLoadMode.values()[modeI];
+                MapLoader.getInstance().loadArea(Integer.parseInt(args[2]), Integer.parseInt(args[4]), Integer.parseInt(args[3]), Integer.parseInt(args[5]), mode, force, sender);
                 return;
             } else {
                 sender.sendMessage(new TextComponentTranslation("cmd.map.desc.1"));
@@ -72,7 +94,8 @@ public class CommandGtwMap extends CommandBase {
     }
 
     @Override
-    public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, BlockPos targetPos) {
+    public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, BlockPos
+            targetPos) {
         if (args.length == 1) {
             ArrayList l = new ArrayList();
             l.add("edit");

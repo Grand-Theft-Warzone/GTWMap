@@ -48,7 +48,7 @@ public abstract class MapContainer {
         return tiles.get(pos);
     }
 
-    protected void cleanTile(PartPos pos) {
+    public void cleanTile(PartPos pos) {
         tiles.remove(pos);
     }
 

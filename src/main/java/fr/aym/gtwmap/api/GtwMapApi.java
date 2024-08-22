@@ -5,10 +5,14 @@ import fr.aym.gtwmap.common.gps.GpsNode;
 import fr.aym.gtwmap.common.gps.GpsNodes;
 import fr.aym.gtwmap.common.gps.WaypointNode;
 import fr.aym.gtwmap.network.BBMessageGpsNodes;
+import lombok.Getter;
+import lombok.Setter;
 
 import javax.annotation.Nullable;
 import javax.vecmath.Vector3f;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -16,6 +20,19 @@ import java.util.UUID;
  * This class provides methods to interact with the gps nodes and waypoints on the map
  */
 public class GtwMapApi {
+    /**
+     * -- GETTER --
+     * Get all tracked objects
+     *
+     * @return All tracked objects
+     */
+    @Getter
+    private static final Set<ITrackableObject<?>> trackedObjects = new HashSet<>();
+
+    @Setter
+    @Getter
+    private static boolean renderPoliceBlinking = false;
+
     /**
      * Add a new waypoint marker to the map
      *
@@ -85,5 +102,30 @@ public class GtwMapApi {
      */
     public static void markWaypointsDirty() {
         GpsNodes.getInstance().markDirty();
+    }
+
+    /**
+     * Add a new object to show on the map, and keep track of it when pos changes
+     *
+     * @param object The object to track
+     */
+    public static void addTrackedObject(ITrackableObject<?> object) {
+        if (trackedObjects.contains(object)) {
+            throw new IllegalArgumentException("Object " + object + "is already tracked");
+        }
+        trackedObjects.add(object);
+    }
+
+    /**
+     * Remove a tracked object
+     *
+     * @param object The object to stop tracking
+     */
+    public static void removeTrackedObject(Object object) {
+        trackedObjects.remove(object instanceof ITrackableObject ? object : new ITrackableObject.TrackedObjectWrapper(object));
+    }
+
+    public static boolean isTracked(Object object) {
+        return trackedObjects.contains(object instanceof ITrackableObject ? object : new ITrackableObject.TrackedObjectWrapper(object));
     }
 }

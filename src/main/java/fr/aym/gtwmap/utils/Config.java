@@ -10,16 +10,20 @@ public class Config
 {
 	private static Configuration config;
 
+	public static boolean debug = false;
 	public static int[] mapDims = new int[4];
+	public static int mapSaveIntervalSeconds = 120;
 
 	public static void load(File file, Side side)
 	{
 		config = new Configuration(file);
 		config.load();
-		mapDims[0] = config.getInt("MapMinX", "RealTimeMap", -1000, Integer.MIN_VALUE, Integer.MAX_VALUE, "Coordonnée x minimale de la carte");
-		mapDims[1] = config.getInt("MapMaxX", "RealTimeMap", 1000, Integer.MIN_VALUE, Integer.MAX_VALUE, "Coordonnée x maximale de la carte");
-		mapDims[2] = config.getInt("MapMinZ", "RealTimeMap", -1500, Integer.MIN_VALUE, Integer.MAX_VALUE, "Coordonnée z minimale de la carte");
-		mapDims[3] = config.getInt("MapMaxZ", "RealTimeMap", 1500, Integer.MIN_VALUE, Integer.MAX_VALUE, "Coordonnée z maximale de la carte");
+		mapDims[0] = config.getInt("MapMinX", "RealTimeMap", -6527, Integer.MIN_VALUE, Integer.MAX_VALUE, "Min x coordinate of the map");
+		mapDims[1] = config.getInt("MapMaxX", "RealTimeMap", 4863, Integer.MIN_VALUE, Integer.MAX_VALUE, "Max x coordinate of the map");
+		mapDims[2] = config.getInt("MapMinZ", "RealTimeMap", -8959, Integer.MIN_VALUE, Integer.MAX_VALUE, "Min z coordinate of the map");
+		mapDims[3] = config.getInt("MapMaxZ", "RealTimeMap", 2303, Integer.MIN_VALUE, Integer.MAX_VALUE, "Max z coordinate of the map");
+		debug = config.getBoolean("Debug", "RealTimeMap", false, "Enable debug mode");
+		mapSaveIntervalSeconds = config.getInt("MapSaveIntervalSeconds", "RealTimeMap", 120, 1, Integer.MAX_VALUE, "Interval between map saves in seconds, if there is less than 4 parts to save.");
 		config.save();
 	}
 }

@@ -1,14 +1,15 @@
-package fr.aym.gtwmap.map;
+package fr.aym.gtwmap.map.loader;
 
 import com.google.common.collect.Queues;
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.map.*;
+import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import io.netty.util.internal.ConcurrentSet;
 import lombok.Getter;
-import net.minecraft.client.Minecraft;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraft.util.text.TextFormatting;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
@@ -19,14 +20,19 @@ import java.io.IOException;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MapLoader {
     @Getter
     private static MapLoader instance;
     public static final int VERSION = 1;
-    public static volatile int godMode = 0;
-    public static volatile int amountToLoad = 0;
+    public static AtomicReference<EnumLoadMode> godMode = new AtomicReference<>(EnumLoadMode.LOAD_FROM_FILE);
+    public static AtomicInteger amountToLoad = new AtomicInteger(0);
     public static volatile boolean makingLoadList;
     public static ICommandSender listener;
 
@@ -35,6 +41,11 @@ public class MapLoader {
     private final Set<MapPart> loadingParts = new ConcurrentSet<>();
     @Getter
     private final Queue<MapPart> saveQueue = Queues.newArrayDeque();
+
+    @Getter
+    private final Queue<AsyncMapPartLoader.ChunkLoader> chunkLoaders = Queues.newArrayDeque();
+
+    public static volatile long lastMsg;
 
     public final ThreadPoolExecutor pool = new ThreadPoolExecutor(
             10, // core pool size
@@ -50,17 +61,18 @@ public class MapLoader {
                     else
                         t.setName("MapRenderer#" + threadId);
                     threadId++;
+                    t.setUncaughtExceptionHandler((t1, e) -> {
+                        GtwMapMod.log.error("Error in thread " + t1.getName(), e);
+                    });
                     return t;
                 }
             }
     );
 
-    private final MapContainerServer mapContainerServer;
     @Getter
     private final File storage;
 
     public MapLoader(FMLServerStartingEvent event, MapContainerServer mapContainerServer) {
-        this.mapContainerServer = mapContainerServer;
         this.storage = event.getServer().getFile("MapData");
         this.storage.mkdirs();
 
@@ -69,15 +81,15 @@ public class MapLoader {
         pool.submit(new AsyncMapPartSaver(mapContainerServer, this));
     }
 
-    public void loadArea(int xmin, int xmax, int zmin, int zmax, int mode, ICommandSender sender) {
+    public void loadArea(int xmin, int xmax, int zmin, int zmax, EnumLoadMode mode, boolean force, ICommandSender sender) {
         System.out.println("Mode is " + godMode + " " + listener + " " + loadingParts);
-        //listener = null;
         MapContainerServer mapContainer = (MapContainerServer) MapContainer.getInstance(false);
-        if (listener == null) {
+        if (listener == null || force) {
             listener = sender;
+            lastMsg = System.currentTimeMillis();
             System.out.println("Starting to load map from " + xmin + "," + zmin + " to " + xmax + ", " + zmax + " in mode " + mode + " !");
             World w = FMLCommonHandler.instance().getMinecraftServerInstance().getEntityWorld();
-            godMode = mode;
+            godMode.set(mode);
             makingLoadList = true;
             xmin = (xmin < 0 ? xmin - GtwMapConstants.TILE_SIZE : xmin) / GtwMapConstants.TILE_SIZE;
             zmin = (zmin < 0 ? zmin - GtwMapConstants.TILE_SIZE : zmin) / GtwMapConstants.TILE_SIZE;
@@ -93,22 +105,29 @@ public class MapLoader {
                     amount++;
                 }
             }
-            godMode = mode; //Do again beacause of async things
             makingLoadList = false;
-            sender.sendMessage(new TextComponentString(amount + " map parts are loading..."));
+            sender.sendMessage(new TextComponentTranslation("gtwmap.load.start", amount));
         } else {
-            sender.sendMessage(new TextComponentString(TextFormatting.RED + "Erreur : un rendu est déjà en cours d'éxécution !"));
+            sender.sendMessage(new TextComponentTranslation("gtwmap.load.already_loading"));
         }
     }
 
-    protected MapPart loadPartFromFile(World world, PartPos pos) throws IOException {
+    public MapPart loadPartFromFile(World world, PartPos pos) throws IOException {
+        if (godMode.get().isReloadingAll()) {
+            GtwMapMod.log.info("Loading {} from file: ignoring because loading mode is reloading all.", pos);
+            MapPart part = new MapPartServer(world, pos, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE);
+            part.fillWithColor(Color.LIGHT_GRAY.getRGB());
+            part.setDirty(true, null);
+            part.refreshMapContents();
+            return part;
+        }
         File mapFile = new File(storage, "map_part_" + pos.xOrig + "_" + pos.zOrig + ".mapdata");
         GtwMapMod.log.info("Loading {} from file : {}", pos, mapFile.exists());
         if (mapFile.exists()) {
             Scanner sc = new Scanner(mapFile, "UTF-8");
             int version = -1, width = -1, height = -1;
             int[] data;
-            boolean gray = godMode == 2;
+            boolean gray = godMode.get().isReloadingAll();
             int id = -1;
             MapPart part;
             try {
@@ -123,16 +142,13 @@ public class MapLoader {
                 line = sc.nextLine();
                 sp = line.split(";");
                 for (int i = 0; i < data.length; i++) {
-                    if (godMode == 2)
-                        data[i] = Color.LIGHT_GRAY.getRGB();
-                    else {
-                        id = i;
-                        int val = Integer.parseInt(sp[i]);
-                        data[i] = val;
-                        //if(pos.xOrig == 0 && pos.zOrig == 0)
-                        //  System.out.println("Loading " + pos + " " + i + " " + val +" " + Color.CYAN.getRGB() +" //GOD// " + godMode);
-                        if (val == Color.LIGHT_GRAY.getRGB() || (godMode == 1 && (val == Color.RED.getRGB() || val == Color.BLACK.getRGB() || val == Color.ORANGE.getRGB())))
-                            gray = true;
+                    id = i;
+                    int val = Integer.parseInt(sp[i]);
+                    data[i] = val;
+                    //if(pos.xOrig == 0 && pos.zOrig == 0)
+                    //  System.out.println("Loading " + pos + " " + i + " " + val +" " + Color.CYAN.getRGB() +" //GOD// " + godMode);
+                    if (val == Color.LIGHT_GRAY.getRGB() || (godMode.get().isFixingNonLoaded() && (val == Color.RED.getRGB() || val == Color.ORANGE.getRGB() || val == Color.CYAN.getRGB()))) {
+                        gray = true;
                     }
                 }
             } catch (Exception e) {
@@ -145,11 +161,8 @@ public class MapLoader {
                 gray = true;
             }
             sc.close();
-            System.out.println("Gray: " + gray + " // " + godMode);
-            if (!gray)
-                part.setDirty(false, null);
-            else
-                part.setDirty(true, null);
+            // System.out.println("Gray: " + gray + " // " + godMode);
+            part.setDirty(gray, null);
             part.refreshMapContents();
             return part;
         } else {
@@ -157,9 +170,9 @@ public class MapLoader {
         }
     }
 
-    protected void load(MapPart part) {
+    public void load(MapPart part) {
         if (!loadingParts.contains(part)) {
-            System.out.println("Requesting load " + part + " " + part.getPos());
+            // System.out.println("Requesting load " + part + " " + part.getPos());
             //System.out.println("Loading part "+pos);
 	    	/*if(!part.expired())
 	    	{
@@ -169,29 +182,69 @@ public class MapLoader {
 	    	}*/
             part.setDirty(false, null);
             part.onContentsChange();
+            part.createLoadingTracker();
             loadingParts.add(part);
-            amountToLoad++;
-            pool.submit(new AsyncMapPartLoader(this, part));
+            amountToLoad.getAndIncrement();
+            pool.submit(new AsyncMapPartLoader(this, part, part.getLoadingTracker()));
         }
     }
 
     protected void resumePartLoading(MapPart part) {
-        if (loadingParts.contains(part)) {
-            pool.submit(new AsyncMapPartLoader(this, part));
+        //   System.out.println("Resuming load " + part + " " + part.getPos() + " " + loadingParts.contains(part));
+        if (!loadingParts.contains(part)) {
+            GtwMapMod.log.error("Resuming load of a part that is not loading: {}", part);
+            return;
         }
+        if (part.getLoadingTracker() != null) {
+            part.getLoadingTracker().endChunkLoad();
+        }
+        pool.submit(new AsyncMapPartLoader(this, part, part.getLoadingTracker()));
     }
 
     public void onLoadEnd(MapPart part) {
-        saveQueue.add(part);
+        if (!saveQueue.contains(part)) {
+            saveQueue.add(part);
+        }
         loadingParts.remove(part);
         if (!makingLoadList) {
-            int updated = MapLoader.amountToLoad - loadingParts.size();
-            if (MapLoader.amountToLoad != 0) {
-                int percent = 100 - 100 * loadingParts.size() / MapLoader.amountToLoad;
-                System.out.println("Render in progress... " + percent + "% Details: " + updated + "/" + MapLoader.amountToLoad + " " + loadingParts.size());
+            lastMsg = System.currentTimeMillis();
+            int amountToLoad = MapLoader.amountToLoad.get();
+            if (amountToLoad != 0) {
+                int updated = amountToLoad - loadingParts.size();
+                int percent = 100 - 100 * loadingParts.size() / amountToLoad;
+                System.out.println("Render in progress... Tiles fully loaded: " + percent + "% Details: " + updated + "/" + amountToLoad + " " + loadingParts.size());
                 if (MapLoader.listener != null)
-                    MapLoader.listener.sendMessage(new TextComponentString("Render in progress... " + percent + "%"));
+                    MapLoader.listener.sendMessage(new TextComponentString("Render in progress... Tiles fully loaded: " + percent + "%"));
+                long totalLoaded = getLoadingParts().stream().mapToInt(p -> p.getLoadingTracker() != null ? p.getLoadingTracker().getLoadingProgress() : 0).sum();
+                percent = getLoadingParts().isEmpty() ? 100 : (int) (totalLoaded / getLoadingParts().size());
+                System.out.println("Average tile progress: " + percent + "%");
+                if (MapLoader.listener != null)
+                    MapLoader.listener.sendMessage(new TextComponentString("Average tile progress: " + percent + "%"));
+                if (Config.debug) {
+                    System.out.println("Working threads: " + pool.getActiveCount());
+                    getLoadingParts().forEach(p -> {
+                        if (p.getLoadingTracker() != null) {
+                            p.getLoadingTracker().printInfos();
+                        }
+                    });
+                }
             }
+        }
+    }
+
+    public void addChunkLoading(AsyncMapPartLoader.ChunkLoader chunkLoader) {
+        chunkLoaders.add(chunkLoader);
+    }
+
+    public void updateChunkLoading() {
+        int i = 16;
+        while (!chunkLoaders.isEmpty() && i > 0) {
+            AsyncMapPartLoader.ChunkLoader chunkLoader = chunkLoaders.poll();
+            //long start = System.currentTimeMillis();
+            chunkLoader.run();
+            // long end = System.currentTimeMillis();
+            //System.out.println("Chunk loading took " + (end - start) + "ms");
+            i--;
         }
     }
 }

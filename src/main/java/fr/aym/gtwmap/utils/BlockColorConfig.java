@@ -1,10 +1,9 @@
 package fr.aym.gtwmap.utils;
 
 import fr.aym.gtwmap.GtwMapMod;
-import fr.aym.gtwmap.map.BlockColourGen;
-import fr.aym.gtwmap.map.BlockColours;
+import fr.aym.gtwmap.map.loader.BlockColourGen;
+import fr.aym.gtwmap.map.loader.BlockColours;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 
 import java.io.File;

@@ -1,5 +1,6 @@
-package fr.aym.gtwmap.map;
+package fr.aym.gtwmap.map.loader;
 
+import fr.aym.gtwmap.map.Utils;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.lwjgl.opengl.GL11;
