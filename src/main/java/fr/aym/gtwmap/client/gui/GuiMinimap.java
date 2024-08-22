@@ -162,8 +162,7 @@ public class GuiMinimap extends GuiFrame {
         if (customMarker == null) {
             return;
         }
-        int size = customMarker.getIcon().contains("gun") || customMarker.getIcon().contains("bank") || customMarker.getIcon().contains("car") || customMarker.getIcon().contains("r_arrow") ? 50 : 512;
-        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, size, size);
+        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, 50, 50);
         GuiComponent<?> label = new GuiLabel("") {
             @Override
             protected void bindLayerBounds() {

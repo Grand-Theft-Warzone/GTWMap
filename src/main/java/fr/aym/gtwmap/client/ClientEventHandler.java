@@ -6,7 +6,9 @@ import fr.aym.gtwmap.api.ITrackableObject;
 import fr.aym.gtwmap.client.gps.GpsNavigator;
 import fr.aym.gtwmap.client.gui.GuiBigMap;
 import fr.aym.gtwmap.client.gui.GuiMinimap;
+import fr.aym.gtwmap.utils.Config;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.passive.EntityPig;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -22,13 +24,16 @@ public class ClientEventHandler {
 
     public static final GpsNavigator gpsNavigator = new GpsNavigator();
 
+    //TODO TRANSLATE
+    public static KeyBinding openMap = new KeyBinding("Open map", Keyboard.KEY_M, "GtwMap");
+
     @SubscribeEvent
     public void onKeyTyped(InputEvent.KeyInputEvent event) {
         if (MC.world != null) {
-            if (Keyboard.isKeyDown(Keyboard.KEY_O)) {
+            if (openMap.isPressed()) {
                 ACsGuiApi.asyncLoadThenShowGui("client_map", () -> new GuiBigMap(false));
             }
-            if (Keyboard.isKeyDown(Keyboard.KEY_P)) {
+            if (Config.debug && Keyboard.isKeyDown(Keyboard.KEY_P)) {
                 if (ACsGuiApi.getDisplayHudGui() != null) {
                     ACsGuiApi.closeHudGui();
                 } else {

@@ -78,7 +78,7 @@ public class GuiBigMap extends GuiFrame {
         super(new GuiScaler.AdjustFullScreen());
         setCssId("root");
         setPauseGame(false);
-        setNeedsCssReload(true);
+        setNeedsCssReload(false);
         if (adminMode) {
             editMode = EditMode.VIEW_NODES;
         }
@@ -238,8 +238,7 @@ public class GuiBigMap extends GuiFrame {
         if (customMarker == null) {
             return;
         }
-        int size = customMarker.getIcon().contains("gun") || customMarker.getIcon().contains("bank") || customMarker.getIcon().contains("car") || customMarker.getIcon().contains("r_arrow") ? 50 : 512;
-        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, size, size);
+        GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + customMarker.getIcon() + ".png"), 0, 0, 50, 50);
         GuiComponent<?> label = new GuiLabel("").setCssId("gps_node").setCssClass("waypoint");
         label.setHoveringText(Collections.singletonList(customMarker.getName()));
         WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(customMarker.getPosition().x, customMarker.getPosition().z, icon);
