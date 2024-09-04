@@ -23,8 +23,10 @@
 }
 
 .waypoint {
-    padding-left: 1px;
-    padding-top: 1px;
+    padding: 0px;
+
+    text-align: center;
+    text-align-vertical: center;
 
     left: auto;
     top: auto;

@@ -6,9 +6,9 @@ import net.minecraft.entity.Entity;
 public interface ITrackableObject<T> {
     T getTrackedObject();
 
-    float getPosX();
+    float getPosX(float partialTicks);
 
-    float getPosZ();
+    float getPosZ(float partialTicks);
 
     String getDisplayName();
 
@@ -30,13 +30,13 @@ public interface ITrackableObject<T> {
         }
 
         @Override
-        public float getPosX() {
-            return (float) this.entity.posX;
+        public float getPosX(float partialTicks) {
+            return (float) (this.entity.prevPosX + (this.entity.posX - this.entity.prevPosX) * partialTicks);
         }
 
         @Override
-        public float getPosZ() {
-            return (float) this.entity.posZ;
+        public float getPosZ(float partialTicks) {
+            return (float) (this.entity.prevPosZ + (this.entity.posZ - this.entity.prevPosZ) * partialTicks);
         }
 
         @Override
@@ -73,12 +73,12 @@ public interface ITrackableObject<T> {
         }
 
         @Override
-        public float getPosX() {
+        public float getPosX(float partialTicks) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public float getPosZ() {
+        public float getPosZ(float partialTicks) {
             throw new UnsupportedOperationException();
         }
 

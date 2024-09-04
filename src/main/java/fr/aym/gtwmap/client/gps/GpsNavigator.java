@@ -61,6 +61,7 @@ public class GpsNavigator {
         clear();
         if ((customWaypoint != null ? customWaypoint : node).getDistance(player.getPositionVector()) < 5) {
             player.sendMessage(new TextComponentString("Arrived at destination"));
+            setCustomWaypoint(null);
             return;
         }
         GpsNodes nodes = GpsNodes.getInstance();

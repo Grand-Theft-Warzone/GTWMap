@@ -11,7 +11,7 @@ import fr.aym.acsguis.component.style.ComponentStyleManager;
 import fr.aym.acsguis.component.textarea.GuiLabel;
 import fr.aym.acsguis.component.textarea.GuiTextField;
 import fr.aym.acsguis.cssengine.selectors.EnumSelectorContext;
-import fr.aym.acsguis.cssengine.style.EnumCssStyleProperties;
+import fr.aym.acsguis.cssengine.style.EnumCssStyleProperty;
 import fr.aym.acsguis.event.listeners.mouse.IMouseExtraClickListener;
 import fr.aym.acsguis.event.listeners.mouse.IMouseMoveListener;
 import fr.aym.acsguis.utils.GuiTextureSprite;
@@ -32,6 +32,7 @@ import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.resources.I18n;
@@ -63,7 +64,7 @@ public class GuiBigMap extends GuiFrame {
     private EditMode editMode = EditMode.VIEW;
 
     private final GuiPanel mapPane;
-    private final Map<PartPos, GuiPanel> partsStore = new HashMap<>();
+    private final Map<PartPos, PartPosAutoStyleHandler> partsStore = new HashMap<>();
     private final Map<EntityPlayer, ITrackableObject<?>> trackedPlayers = new HashMap<>();
     private final Map<ITrackableObject<?>, EntityPosCache> tackedObjectsPosCache = new HashMap<>();
 
@@ -78,7 +79,7 @@ public class GuiBigMap extends GuiFrame {
         super(new GuiScaler.AdjustFullScreen());
         setCssId("root");
         setPauseGame(false);
-        setNeedsCssReload(false);
+        setNeedsCssReload(true);
         if (adminMode) {
             editMode = EditMode.VIEW_NODES;
         }
@@ -172,7 +173,7 @@ public class GuiBigMap extends GuiFrame {
             updateViewport(new GuiMinimap.Viewport(newViewportX, newViewportY, newWidth, newHeight));
         });
 
-        add(new GuiLabel(2, 2, getWidth() - 4, 20, I18n.format("gui.map.title")).setCssId("title"));
+        add(new GuiLabel(2, 2, (int) (getWidth() - 4), 20, I18n.format("gui.map.title")).setCssId("title"));
         for (EntityPlayer player : mc.world.playerEntities) {
             boolean self = player == mc.player;
             ITrackableObject<?> trackedObject = new ITrackableObject.TrackedEntity(player, self ? I18n.format("gui.map.you") : player.getDisplayNameString(), self ? "r_arrow_white" : "player_white");
@@ -243,6 +244,12 @@ public class GuiBigMap extends GuiFrame {
         label.setHoveringText(Collections.singletonList(customMarker.getName()));
         WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(customMarker.getPosition().x, customMarker.getPosition().z, icon);
         label.getStyle().addAutoStyleHandler(position);
+        label.addClickListener((mouseX, mouseY, mouseButton) -> {
+            if (mouseButton != 1)
+                return;
+            ClientEventHandler.gpsNavigator.clear();
+            ClientEventHandler.gpsNavigator.setCustomWaypoint(null);
+        });
         customMarkerComponent = label;
         mapPane.add(label);
     }
@@ -345,14 +352,14 @@ public class GuiBigMap extends GuiFrame {
                 //System.out.println("World coords : " + worldX + " " + worldZ);
                 MapApp.customPoint.getStyle().addAutoStyleHandler(new AutoStyleHandler<ComponentStyleManager>() {
                     @Override
-                    public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
-                        if (property == EnumCssStyleProperties.LEFT) {
+                    public boolean handleProperty(EnumCssStyleProperty property, EnumSelectorContext context, ComponentStyleManager csm) {
+                        if (property == EnumCssStyleProperty.LEFT) {
                             float guiX = (worldX - viewport.x) * mapPane.getWidth() / viewport.width;
                             csm.getXPos().setAbsolute(guiX);
                             //System.out.println("Cmp guiX " + guiX + " " + worldX);
                             return true;
                         }
-                        if (property == EnumCssStyleProperties.TOP) {
+                        if (property == EnumCssStyleProperty.TOP) {
                             float guiY = (worldZ - viewport.y) * mapPane.getHeight() / viewport.height;
                             csm.getYPos().setAbsolute(guiY);
                             // System.out.println("Cmp guiY " + guiY + " " + worldZ);
@@ -363,8 +370,8 @@ public class GuiBigMap extends GuiFrame {
                     }
 
                     @Override
-                    public Collection<EnumCssStyleProperties> getModifiedProperties(ComponentStyleManager componentStyleManager) {
-                        return Arrays.asList(EnumCssStyleProperties.LEFT, EnumCssStyleProperties.TOP);
+                    public Collection<EnumCssStyleProperty> getModifiedProperties(ComponentStyleManager componentStyleManager) {
+                        return Arrays.asList(EnumCssStyleProperty.LEFT, EnumCssStyleProperty.TOP);
                     }
                 });
             }*/
@@ -428,7 +435,6 @@ public class GuiBigMap extends GuiFrame {
         int by = (int) (-(uy % 400) * mapPane.getHeight() / newViewport.height);
 
         MapContainerClient mapContainer = (MapContainerClient) MapContainer.getInstance(true);
-
         countx = 0;
         List<PartPos> oldPoses = new ArrayList<>(partsStore.keySet());
         int x = (int) (newViewport.x - (ux % 400) - 400);
@@ -445,53 +451,25 @@ public class GuiBigMap extends GuiFrame {
                 PartPos pos = new PartPos(x2 / 400, z2 / 400);
                 MapPartClient part = (MapPartClient) mapContainer.requestTile(x2, z2, mc.world, mc.player);
                 part.refreshMapContents();
-                int finalDx = dx;
-                int finalDy = dy;
-
-                GuiPanel partPane = partsStore.get(pos);
+                PartPosAutoStyleHandler partPane = partsStore.get(pos);
                 if (partPane == null) {
-                    partPane = (GuiPanel) new GuiPanel().getStyle()
+                    GuiPanel pane = (GuiPanel) new GuiPanel().getStyle()
                             .setTexture(new GuiTextureSprite(part.getLocation(), 0, 0, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE)).getOwner();
+                    partPane = new PartPosAutoStyleHandler(pane, dx, dy, dw, dh);
+                    pane.getStyle().addAutoStyleHandler(partPane);
                     partsStore.put(pos, partPane);
-                    mapPane.add(partPane);
+                    mapPane.add(pane);
                 } else {
                     oldPoses.remove(pos);
+                    partPane.update(dx, dy, dw, dh);
                 }
-                partPane.getStyle().getAutoStyleHandlers().clear();
-                partPane.getStyle().addAutoStyleHandler(new AutoStyleHandler<ComponentStyleManager>() {
-                    @Override
-                    public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
-                        if (property == EnumCssStyleProperties.LEFT) {
-                            csm.getXPos().setAbsolute(finalDx);
-                            return true;
-                        }
-                        if (property == EnumCssStyleProperties.TOP) {
-                            csm.getYPos().setAbsolute(finalDy);
-                            return true;
-                        }
-                        if (property == EnumCssStyleProperties.WIDTH) {
-                            csm.getWidth().setAbsolute(dw);
-                            return true;
-                        }
-                        if (property == EnumCssStyleProperties.HEIGHT) {
-                            csm.getHeight().setAbsolute(dh);
-                            return true;
-                        }
-                        return false;
-                    }
-
-                    @Override
-                    public Collection<EnumCssStyleProperties> getModifiedProperties(ComponentStyleManager componentStyleManager) {
-                        return Arrays.asList(EnumCssStyleProperties.LEFT, EnumCssStyleProperties.TOP, EnumCssStyleProperties.WIDTH, EnumCssStyleProperties.HEIGHT);
-                    }
-                });
                 z = z + 400;
                 county++;
             }
             x = x + 400;
             countx++;
         }
-        oldPoses.stream().map(partsStore::remove).forEach(mapPane::remove);
+        oldPoses.stream().map(partsStore::remove).map(PartPosAutoStyleHandler::getPartPane).forEach(mapPane::remove);
 
         //====================== Geo localisation ======================
         if (tackedObjectsPosCache.size() != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size())) {
@@ -521,14 +499,13 @@ public class GuiBigMap extends GuiFrame {
         }
 
         viewport = newViewport;
-        //TODO ONLY REFRESH POSITIONS
-        mapPane.getStyle().refreshCss(false, "viewport_upd");
+        mapPane.getStyle().refreshCss(getGui(), false, EnumCssStyleProperty.LEFT, EnumCssStyleProperty.TOP, EnumCssStyleProperty.WIDTH, EnumCssStyleProperty.HEIGHT);
     }
 
     public void makeTrackedPoint(ITrackableObject<?> object, boolean rotateLabel) {
         int size = object.getIcon().contains("gun") || object.getIcon().contains("bank") || object.getIcon().contains("car") || object.getIcon().contains("r_arrow") ? 50 : 512;
         GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + object.getIcon() + ".png"), 0, 0, size, size);
-        WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler(object.getPosX(), object.getPosZ(), icon);
+        WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler(object.getPosX(1), object.getPosZ(1), icon);
         GuiLabel label = new GuiLabel("") {
             @Override
             protected void bindLayerBounds() {
@@ -590,10 +567,10 @@ public class GuiBigMap extends GuiFrame {
                         }
                         GlStateManager.glEnd();
                     } else {
-                        float startX = entry.getValue().getScreenX() + 4;
-                        float startY = entry.getValue().getScreenY() + 4;
-                        float endX = component.getScreenX() + 4;
-                        float endY = component.getScreenY() + 4;
+                        float startX = entry.getValue().getScreenX() + 8;
+                        float startY = entry.getValue().getScreenY() + 8;
+                        float endX = component.getScreenX() + 8;
+                        float endY = component.getScreenY() + 8;
                         if (twoWay) {
                             GlStateManager.color(1, 1, 1, 1);
                             GlStateManager.glBegin(GL11.GL_LINES);
@@ -795,10 +772,10 @@ public class GuiBigMap extends GuiFrame {
         int z = (int) (viewport.y + (mouseY - mapPane.getRenderMinY()) * viewport.height / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight()));
         mc.fontRenderer.drawString("x= " + x + " z=" + z, mouseX + 10, mouseY + 10, Color.WHITE.getRGB());
         if (loadingTiles > 0) {
-            mc.fontRenderer.drawString(loadingTiles + " tiles loading", 2, getHeight() - 21, Color.CYAN.getRGB());
+            mc.fontRenderer.drawString(loadingTiles + " tiles loading", 2, (int) (getHeight() - 21), Color.CYAN.getRGB());
         }
         if (editMode != EditMode.VIEW) {
-            mc.fontRenderer.drawString(countx + "*" + county + " (" + (countx * county) + ") tiles displayed", 2, getHeight() - 11, Color.WHITE.getRGB());
+            mc.fontRenderer.drawString(countx + "*" + county + " (" + (countx * county) + ") tiles displayed", 2, (int) (getHeight() - 11), Color.WHITE.getRGB());
         }
         String modeTitle = null;
         switch (editMode) {
@@ -820,7 +797,7 @@ public class GuiBigMap extends GuiFrame {
                 modeTitle = TextFormatting.LIGHT_PURPLE + "Right click on two nodes in a specific order to add/remove a one way link between them";
                 break;
         }
-        GuiAPIClientHelper.drawHoveringText(Collections.singletonList(modeTitle), getWidth() - 1 - getScreenX(), 3);
+        GuiAPIClientHelper.drawHoveringText(Collections.singletonList(modeTitle), (int) (getWidth() - 1 - getScreenX()), 3);
         //mc.fontRenderer.drawString(modeTitle, , nodeColor);
     }
 
@@ -868,16 +845,16 @@ public class GuiBigMap extends GuiFrame {
         private GuiTextureSprite icon;
 
         @Override
-        public boolean handleProperty(EnumCssStyleProperties property, EnumSelectorContext context, ComponentStyleManager csm) {
-            if (property == EnumCssStyleProperties.LEFT) {
+        public boolean handleProperty(EnumCssStyleProperty property, EnumSelectorContext context, ComponentStyleManager csm) {
+            if (property == EnumCssStyleProperty.LEFT) {
                 csm.getXPos().setAbsolute((posX - GuiBigMap.this.viewport.x) * GuiBigMap.this.mapPane.getWidth() / GuiBigMap.this.viewport.width - 8);
                 return true;
             }
-            if (property == EnumCssStyleProperties.TOP) {
+            if (property == EnumCssStyleProperty.TOP) {
                 csm.getYPos().setAbsolute((posZ - GuiBigMap.this.viewport.y) * GuiBigMap.this.mapPane.getHeight() / GuiBigMap.this.viewport.height - 8);
                 return true;
             }
-            if (property == EnumCssStyleProperties.TEXTURE && icon != null) {
+            if (property == EnumCssStyleProperty.TEXTURE && icon != null) {
                 csm.setTexture(icon);
                 return true;
             }
@@ -885,8 +862,49 @@ public class GuiBigMap extends GuiFrame {
         }
 
         @Override
-        public Collection<EnumCssStyleProperties> getModifiedProperties(ComponentStyleManager componentStyleManager) {
-            return Arrays.asList(EnumCssStyleProperties.LEFT, EnumCssStyleProperties.TOP, EnumCssStyleProperties.TEXTURE);
+        public Collection<EnumCssStyleProperty> getModifiedProperties(ComponentStyleManager componentStyleManager) {
+            return Arrays.asList(EnumCssStyleProperty.LEFT, EnumCssStyleProperty.TOP, EnumCssStyleProperty.TEXTURE);
+        }
+    }
+
+    @AllArgsConstructor
+    public static class PartPosAutoStyleHandler implements AutoStyleHandler<ComponentStyleManager> {
+        @Getter
+        private final GuiPanel partPane;
+        private float posX;
+        private float posZ;
+        private float sizeX;
+        private float sizeZ;
+
+        @Override
+        public boolean handleProperty(EnumCssStyleProperty property, EnumSelectorContext context, ComponentStyleManager csm) {
+            switch (property) {
+                case LEFT:
+                    csm.getXPos().setAbsolute(posX);
+                    return true;
+                case TOP:
+                    csm.getYPos().setAbsolute(posZ);
+                    return true;
+                case WIDTH:
+                    csm.getWidth().setAbsolute(sizeX);
+                    return true;
+                case HEIGHT:
+                    csm.getHeight().setAbsolute(sizeZ);
+                    return true;
+            }
+            return false;
+        }
+
+        @Override
+        public Collection<EnumCssStyleProperty> getModifiedProperties(ComponentStyleManager componentStyleManager) {
+            return Arrays.asList(EnumCssStyleProperty.LEFT, EnumCssStyleProperty.TOP, EnumCssStyleProperty.WIDTH, EnumCssStyleProperty.HEIGHT);
+        }
+
+        public void update(float dx, float dy, float dw, float dh) {
+            posX = dx;
+            posZ = dy;
+            sizeX = dw;
+            sizeZ = dh;
         }
     }
 
@@ -898,12 +916,12 @@ public class GuiBigMap extends GuiFrame {
 
         public boolean hasChanged() {
             //  System.out.println("Checking for change " + Math.abs(styleHandler.posX - player.posX) + " " + Math.abs(styleHandler.posZ - player.posZ));
-            return Math.abs(styleHandler.posX - object.getPosX()) > 0.05f || Math.abs(styleHandler.posZ - object.getPosZ()) > 0.05f;
+            return Math.abs(styleHandler.posX - object.getPosX(1)) > 0.05f || Math.abs(styleHandler.posZ - object.getPosZ(1)) > 0.05f;
         }
 
         public void update() {
-            styleHandler.setPosX(object.getPosX());
-            styleHandler.setPosZ(object.getPosZ());
+            styleHandler.setPosX(object.getPosX(1));
+            styleHandler.setPosZ(object.getPosZ(1));
         }
     }
 }
