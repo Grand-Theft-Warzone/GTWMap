@@ -84,7 +84,7 @@ public class GuiMinimap extends GuiFrame {
             trackedPlayers.put(player, trackedObject);
             makeTrackedPoint(trackedObject, self);
         }
-        for (ITrackableObject object : GtwMapApi.getTrackedObjects()) {
+        for (ITrackableObject<?> object : GtwMapApi.getTrackedObjects()) {
             makeTrackedPoint(object, false);
         }
         refreshGpsNodeComponents();

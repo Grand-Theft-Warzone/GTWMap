@@ -180,7 +180,7 @@ public class GuiBigMap extends GuiFrame {
             trackedPlayers.put(player, trackedObject);
             makeTrackedPoint(trackedObject, self);
         }
-        for (ITrackableObject object : GtwMapApi.getTrackedObjects()) {
+        for (ITrackableObject<?> object : GtwMapApi.getTrackedObjects()) {
             makeTrackedPoint(object, false);
         }
         refreshGpsNodeComponents();
@@ -428,22 +428,22 @@ public class GuiBigMap extends GuiFrame {
 
         float ux = newViewport.x < 0 ? newViewport.x - 400 : newViewport.x;
         float uy = newViewport.y < 0 ? newViewport.y - 400 : newViewport.y;
-        int dw = (int) (400 * mapPane.getWidth() / newViewport.width);
-        int dh = (int) (400 * mapPane.getHeight() / newViewport.height);
+        float dw = (400 * mapPane.getWidth() / newViewport.width);
+        float dh = (400 * mapPane.getHeight() / newViewport.height);
 
-        int bx = (int) (-(ux % 400) * mapPane.getWidth() / newViewport.width);
-        int by = (int) (-(uy % 400) * mapPane.getHeight() / newViewport.height);
+        float bx = (-(ux % 400) * mapPane.getWidth() / newViewport.width);
+        float by = (-(uy % 400) * mapPane.getHeight() / newViewport.height);
 
         MapContainerClient mapContainer = (MapContainerClient) MapContainer.getInstance(true);
         countx = 0;
         List<PartPos> oldPoses = new ArrayList<>(partsStore.keySet());
-        int x = (int) (newViewport.x - (ux % 400) - 400);
-        for (int dx = bx - dw; dx < bx + mapPane.getWidth() + dw; dx = dx + dw) {
+        float x = (newViewport.x - (ux % 400) - 400);
+        for (float dx = bx - dw; dx < bx + mapPane.getWidth() + dw; dx = dx + dw) {
             county = 0;
-            int z = (int) (newViewport.y - (uy % 400) - 400);
-            for (int dy = by - dh; dy < by + mapPane.getHeight() + dh; dy = dy + dh) {
-                int x2 = x;
-                int z2 = z;
+            float z = (newViewport.y - (uy % 400) - 400);
+            for (float dy = by - dh; dy < by + mapPane.getHeight() + dh; dy = dy + dh) {
+                int x2 = (int) x;
+                int z2 = (int) z;
                 if (x2 < 0)
                     x2 -= 399;
                 if (z2 < 0)
@@ -509,17 +509,20 @@ public class GuiBigMap extends GuiFrame {
         GuiLabel label = new GuiLabel("") {
             @Override
             protected void bindLayerBounds() {
-                if (rotateLabel) {
+                if (rotateLabel && getX() > 0 && getY() > 0) {
                     GlStateManager.pushMatrix();
                     GlStateManager.translate(getRenderMinX() + getWidth() / 2f, getRenderMinY() + getHeight() / 2f, 0);
                     GlStateManager.rotate(((ITrackableObject.TrackedEntity) object).getTrackedObject().rotationYaw + 90, 0, 0, 1);
                     GlStateManager.translate(-getRenderMinX() - getWidth() / 2f, -getRenderMinY() - getHeight() / 2f, 0);
                 }
+                GL11.glEnable(GL11.GL_SCISSOR_TEST);
+                GuiAPIClientHelper.glScissor(mapPane.getRenderMinX(), mapPane.getRenderMinY(), mapPane.getRenderMaxX() - mapPane.getRenderMinX(), mapPane.getRenderMaxY() - mapPane.getRenderMinY());
             }
 
             @Override
             protected void unbindLayerBounds() {
-                if (rotateLabel) {
+                super.unbindLayerBounds();
+                if (rotateLabel && getX() > 0 && getY() > 0) {
                     GlStateManager.popMatrix();
                 }
             }

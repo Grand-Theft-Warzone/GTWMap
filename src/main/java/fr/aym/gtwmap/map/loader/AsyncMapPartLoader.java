@@ -6,7 +6,9 @@ import fr.aym.gtwmap.utils.BlockColorConfig;
 import fr.aym.gtwmap.utils.Config;
 import lombok.RequiredArgsConstructor;
 import net.minecraft.block.material.MapColor;
+import net.minecraft.block.state.BlockFaceShape;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.Tuple;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -100,7 +102,7 @@ public class AsyncMapPartLoader implements Runnable {
                             for (pos2 = pos2.setPos(pos.getX(), chunk.getTopFilledSegment() + 16, pos.getZ()); pos2.getY() >= 0; pos2.setPos(pos3)) {
                                 pos3 = pos2.down();
                                 state = chunk.getBlockState(pos3);
-                                if (!state.isTopSolid() && !state.getMaterial().isLiquid()) {
+                                if (state.getBlockFaceShape(world, pos, EnumFacing.UP) != BlockFaceShape.SOLID && !state.getMaterial().isLiquid()) {
                                     continue;
                                 }
                                 //if (state.getMaterial().blocksMovement() /*&& !state.getBlock().isLeaves(state, world, blockpos1) && !state.getBlock().isFoliage(world, blockpos1) */|| state.getMaterial().isLiquid())
