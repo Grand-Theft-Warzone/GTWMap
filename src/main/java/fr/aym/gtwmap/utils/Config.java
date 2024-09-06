@@ -13,6 +13,7 @@ public class Config
 	public static boolean debug = false;
 	public static int[] mapDims = new int[4];
 	public static int mapSaveIntervalSeconds = 120;
+	public static boolean showNonFullBlocks = true;
 
 	public static void load(File file, Side side)
 	{
@@ -24,6 +25,7 @@ public class Config
 		mapDims[3] = config.getInt("MapMaxZ", "RealTimeMap", 2303, Integer.MIN_VALUE, Integer.MAX_VALUE, "Max z coordinate of the map");
 		debug = config.getBoolean("Debug", "RealTimeMap", false, "Enable debug mode");
 		mapSaveIntervalSeconds = config.getInt("MapSaveIntervalSeconds", "RealTimeMap", 120, 1, Integer.MAX_VALUE, "Interval between map saves in seconds, if there is less than 4 parts to save.");
+		showNonFullBlocks = config.getBoolean("ShowNonFullBlocks", "MapRendering", true, "Show non full blocks on the map (shows road lines, fences...). Needs map re-render when changed.");
 		config.save();
 	}
 }

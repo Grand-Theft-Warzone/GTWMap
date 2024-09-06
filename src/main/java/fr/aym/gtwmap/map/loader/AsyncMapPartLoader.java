@@ -102,7 +102,7 @@ public class AsyncMapPartLoader implements Runnable {
                             for (pos2 = pos2.setPos(pos.getX(), chunk.getTopFilledSegment() + 16, pos.getZ()); pos2.getY() >= 0; pos2.setPos(pos3)) {
                                 pos3 = pos2.down();
                                 state = chunk.getBlockState(pos3);
-                                if (state.getBlockFaceShape(world, pos, EnumFacing.UP) != BlockFaceShape.SOLID && !state.getMaterial().isLiquid()) {
+                                if ((!Config.showNonFullBlocks || !state.getBlock().canCollideCheck(state, true)) && state.getBlockFaceShape(world, pos, EnumFacing.UP) != BlockFaceShape.SOLID && !state.getMaterial().isLiquid()) {
                                     continue;
                                 }
                                 //if (state.getMaterial().blocksMovement() /*&& !state.getBlock().isLeaves(state, world, blockpos1) && !state.getBlock().isFoliage(world, blockpos1) */|| state.getMaterial().isLiquid())

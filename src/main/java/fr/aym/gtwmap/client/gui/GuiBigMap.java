@@ -437,10 +437,10 @@ public class GuiBigMap extends GuiFrame {
         MapContainerClient mapContainer = (MapContainerClient) MapContainer.getInstance(true);
         countx = 0;
         List<PartPos> oldPoses = new ArrayList<>(partsStore.keySet());
-        float x = (newViewport.x - (ux % 400) - 400);
+        int x = (int) (newViewport.x - (ux % 400) - 400);
         for (float dx = bx - dw; dx < bx + mapPane.getWidth() + dw; dx = dx + dw) {
             county = 0;
-            float z = (newViewport.y - (uy % 400) - 400);
+            int z = (int) (newViewport.y - (uy % 400) - 400);
             for (float dy = by - dh; dy < by + mapPane.getHeight() + dh; dy = dy + dh) {
                 int x2 = (int) x;
                 int z2 = (int) z;
@@ -453,7 +453,15 @@ public class GuiBigMap extends GuiFrame {
                 part.refreshMapContents();
                 PartPosAutoStyleHandler partPane = partsStore.get(pos);
                 if (partPane == null) {
-                    GuiPanel pane = (GuiPanel) new GuiPanel().getStyle()
+                    GuiPanel pane = (GuiPanel) new GuiPanel() {
+                        @Override
+                        protected void bindLayerBounds() {
+                        }
+
+                        @Override
+                        protected void unbindLayerBounds() {
+                        }
+                    }.getStyle()
                             .setTexture(new GuiTextureSprite(part.getLocation(), 0, 0, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE)).getOwner();
                     partPane = new PartPosAutoStyleHandler(pane, dx, dy, dw, dh);
                     pane.getStyle().addAutoStyleHandler(partPane);

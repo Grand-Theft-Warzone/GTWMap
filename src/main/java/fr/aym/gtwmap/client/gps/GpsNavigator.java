@@ -86,6 +86,7 @@ public class GpsNavigator {
             clear();
             player.sendMessage(new TextComponentString("No path found from here"));
             setCustomWaypoint(null);
+            return;
         } else if (customWaypoint != null) {
             route.add(customWaypoint);
         }
