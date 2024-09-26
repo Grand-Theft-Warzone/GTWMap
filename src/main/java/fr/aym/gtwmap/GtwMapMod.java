@@ -182,6 +182,6 @@ public class GtwMapMod {
 
     @Mod.EventHandler
     public void onLoadEnd(FMLLoadCompleteEvent event) {
-        BlockColorConfig.init(new File("MapData", "colors.cfg"));
+        BlockColorConfig.init(new File("MapData", "colors.cfg"), false);
     }
 }

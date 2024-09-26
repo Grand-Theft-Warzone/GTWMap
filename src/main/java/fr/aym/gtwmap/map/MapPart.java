@@ -1,12 +1,14 @@
 package fr.aym.gtwmap.map;
 
 import fr.aym.gtwmap.GtwMapMod;
+import fr.aym.gtwmap.map.loader.AsyncMapPartLoader;
 import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.map.loader.MapPartLoadingTracker;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
 import lombok.Getter;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
@@ -94,7 +96,13 @@ public abstract class MapPart {
                 fillWithColor(Color.ORANGE.getRGB());
                 return this;
             }
-            mapTextureData[z * this.getLength() + x] = Color.LIGHT_GRAY.getRGB();
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(mark);
+            Chunk chunk = world.getChunk(pos);
+            int put = z * getLength() + x;
+            AsyncMapPartLoader.setBlockColor(chunk, pos, new BlockPos.MutableBlockPos(), put, this);
+            onContentsChange();
+            MapLoader.getInstance().getSaveQueue().add(this);
+            return this; //NEW: Don't change state :O
         }
         this.state = dirty ? State.DIRTY : State.LOADED;
         return this;
@@ -102,7 +110,7 @@ public abstract class MapPart {
 
     public void putColorAt(int at, int color) {
         mapTextureData[at] = color;
-        if(loadingTracker != null) {
+        if (loadingTracker != null) {
             loadingTracker.setLastPut(at);
         }
     }

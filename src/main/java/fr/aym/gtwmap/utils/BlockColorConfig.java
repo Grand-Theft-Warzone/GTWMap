@@ -5,6 +5,7 @@ import fr.aym.gtwmap.map.loader.BlockColourGen;
 import fr.aym.gtwmap.map.loader.BlockColours;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraftforge.fml.common.FMLCommonHandler;
 
 import java.io.File;
 
@@ -20,14 +21,18 @@ public class BlockColorConfig {
 	public static final double brightenAmplitude = 0.7;
 	public static final double darkenAmplitude = 1.4;
 
-    public static void init(File config) {
+    public static void init(File config, boolean reload) {
         //if (!config.exists()) {
         //genDefaultBlockColors(config, fakeWorld);
             /*} else {
                 readBlockColors(config);
             }*/
-        if (!config.exists() || !blockColours.CheckFileVersion(config)) {
-            GtwMapMod.log.warn("generating block colours");
+        if (reload || !config.exists() || !blockColours.CheckFileVersion(config)) {
+            GtwMapMod.log.warn("Generating block colours. Forced ? " + reload);
+            if(FMLCommonHandler.instance().getSide().isServer()) {
+                GtwMapMod.log.error("Block colours can't be generated on server side ! You need to generate them on client side and then copy the file to the server.");
+                throw new UnsupportedOperationException("Block colours can't be generated on server side ! You need to generate them on client side and then copy the file to the server.");
+            }
             BlockColourGen.genBlockColours(blockColours);
             // load overrides again to override block and biome colours
             loadBlockColourOverrides(blockColours);

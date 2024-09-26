@@ -1,5 +1,6 @@
 package fr.aym.gtwmap.map.loader;
 
+import com.silvaniastudios.roads.blocks.paint.PaintBlockCustomRenderBase;
 import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.MapPart;
 import fr.aym.gtwmap.utils.BlockColorConfig;
@@ -94,32 +95,9 @@ public class AsyncMapPartLoader implements Runnable {
                             }
                             chunk = chunkTuple.getSecond();
                         }
-                        int color = MapColor.AIR.colorValue;
                         if (chunk != null) {
                             pos.setPos(chunkX * 16 + posXInChunk + x, 0, chunkZ * 16 + posZInChunk + z);
-                            IBlockState state;
-                            //TODO PAS OUF CI-DESSOUS
-                            for (pos2 = pos2.setPos(pos.getX(), chunk.getTopFilledSegment() + 16, pos.getZ()); pos2.getY() >= 0; pos2.setPos(pos3)) {
-                                pos3 = pos2.down();
-                                state = chunk.getBlockState(pos3);
-                                if ((!Config.showNonFullBlocks || !state.getBlock().canCollideCheck(state, true)) && state.getBlockFaceShape(world, pos, EnumFacing.UP) != BlockFaceShape.SOLID && !state.getMaterial().isLiquid()) {
-                                    continue;
-                                }
-                                //if (state.getMaterial().blocksMovement() /*&& !state.getBlock().isLeaves(state, world, blockpos1) && !state.getBlock().isFoliage(world, blockpos1) */|| state.getMaterial().isLiquid())
-                                {
-                                    color = BlockColorConfig.getBlockColor(state);//state.getMapColor(world, pos3);
-                                    // this is the color that gets returned for air
-                                    if (color != -8650628) {
-                                        color = BlockColorConfig.getColumnColour(chunk, pos3.getX(), pos3.getY(), pos3.getZ(), state, color, getPixelHeightW(target.getMapTextureData(), put, target.getLength()), getPixelHeightN(target.getMapTextureData(), put, target.getLength()));
-                                        break;
-                                    }
-                                }
-                            }
-                            if (color != MapColor.AIR.colorValue) {
-                                target.putColorAt(put, getMapColorOver(1, color));
-                            } else {
-                                target.putColorAt(put, Color.BLACK.getRGB());
-                            }
+                            setBlockColor(chunk, pos, pos2, put, target);
                         } else {
                             //System.out.println(">>> [DABG] SET cyan: X " + x + " " + xInPart + " " + " Z " + z + " " + zInPart + " " + " CHUNK " + target.getPos() + " " + chunkPos + " " + posXInChunk + " " + posZInChunk + " LP " + tracker.getLastPut() + " P " + put + ". Load mode " + godMode.get());
                             target.putColorAt(put, Color.CYAN.getRGB());
@@ -170,6 +148,36 @@ public class AsyncMapPartLoader implements Runnable {
             }*/
         }
         return false;
+    }
+
+    public static void setBlockColor(Chunk chunk, BlockPos.MutableBlockPos pos, BlockPos.MutableBlockPos pos2, int put, MapPart target) {
+        int color = MapColor.AIR.colorValue;
+        IBlockState state;
+        BlockPos pos3;
+        for (pos2 = pos2.setPos(pos.getX(), chunk.getTopFilledSegment() + 16, pos.getZ()); pos2.getY() >= 0; pos2.setPos(pos3)) {
+            pos3 = pos2.down();
+            state = chunk.getBlockState(pos3);
+            if (((!Config.showNonFullBlocks && !(state.getBlock() instanceof PaintBlockCustomRenderBase)) || !state.getBlock().canCollideCheck(state, true))
+                    && state.getBlockFaceShape(chunk.getWorld(), pos, EnumFacing.UP) != BlockFaceShape.SOLID && !state.getMaterial().isLiquid()) {
+                continue;
+            }
+            //if (state.getMaterial().blocksMovement() /*&& !state.getBlock().isLeaves(state, world, blockpos1) && !state.getBlock().isFoliage(world, blockpos1) */|| state.getMaterial().isLiquid())
+            {
+                color = BlockColorConfig.getBlockColor(state);//state.getMapColor(world, pos3);
+                // this is the color that gets returned for air
+                if (color != -8650628) {
+                    color = BlockColorConfig.getColumnColour(chunk, pos3.getX(), pos3.getY(), pos3.getZ(), state, color,
+                            getPixelHeightW(target.getMapTextureData(), put, target.getLength()),
+                            getPixelHeightN(target.getMapTextureData(), put, target.getLength()));
+                    break;
+                }
+            }
+        }
+        if (color != MapColor.AIR.colorValue) {
+            target.putColorAt(put, getMapColorOver(1, color));
+        } else {
+            target.putColorAt(put, Color.BLACK.getRGB());
+        }
     }
 
     static int getPixelHeightN(int[] pixels, int offset, int scanSize) {
@@ -227,7 +235,7 @@ public class AsyncMapPartLoader implements Runnable {
         }
     }
 
-    private int getMapColorOver(int index, int colorValue) {
+    static int getMapColorOver(int index, int colorValue) {
         int i = 220;
 
         if (index == 3) {

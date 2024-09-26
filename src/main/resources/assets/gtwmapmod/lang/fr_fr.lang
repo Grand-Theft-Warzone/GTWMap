@@ -8,6 +8,10 @@ cmd.map.desc.2=- '/gtwmap loadmap preload' : charge la carte qui a déjà été 
 cmd.map.desc.3=- '/gtwmap loadmap full [mode] [force]' : réalise le rendu de toute la carte (opération assez longue) à part des coordonnées spécifiées dans la config
 cmd.map.desc.4=- '/gtwmap loadmap region <xmin> <zmin> <xmax> <zmax> <mode> [force]' : réalise le rendu de la carte à partir des coordonnées données en argument. mode 1 : mode normal, met à jour les chunks incomplets, ne génère pas de chunks de carte Minecraft ; mode 2 : met à jour les chunks incomplets en générant ceux qui manquent ; mode 3 : supprime les chunks existants et les recrée tous
 
+cmd.map.regen_colors_start=Régénération des couleurs de la carte...
+cmd.map.regen_colors_end=Opération terminée !
+cmd.map.regen_colors_server=Sur les serveurs dédiés, vous devez envoyer le fichier "MapData/colors.cfg" sur le serveur pour appliquer les nouvelles couleurs de blocs pour la carte.
+
 gtwmap.load.start=%s map parts are loading...
 gtwmap.load.already_loading=§cErreur : un rendu est déjà en cours d'éxécution ! Vous pouvez forcer le rendu en ajouter "force" à la fin de la commande.
 gtwmap.load.end=Opération terminée !

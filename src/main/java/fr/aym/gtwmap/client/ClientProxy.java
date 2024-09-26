@@ -7,6 +7,7 @@ import fr.aym.gtwmap.map.PartPos;
 import fr.aym.gtwmap.server.ServerEventHandler;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import net.minecraft.client.Minecraft;
+import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 
@@ -19,6 +20,8 @@ public class ClientProxy extends CommonProxy {
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
 
         ClientRegistry.registerKeyBinding(ClientEventHandler.openMap);
+
+        ClientCommandHandler.instance.registerCommand(new CommandMapRegen());
     }
 
     @Override

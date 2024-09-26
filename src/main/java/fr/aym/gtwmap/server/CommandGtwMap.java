@@ -4,6 +4,7 @@ import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.loader.EnumLoadMode;
 import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.network.SCMessageEditMap;
+import fr.aym.gtwmap.utils.BlockColorConfig;
 import fr.aym.gtwmap.utils.Config;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
@@ -14,7 +15,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentTranslation;
 
-import java.util.ArrayList;
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
@@ -26,7 +27,7 @@ public class CommandGtwMap extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/gtwmap <edit|loadmap>";
+        return "/gtwmap <edit|loadmap|reload_colors>";
     }
 
     @Override
@@ -89,6 +90,11 @@ public class CommandGtwMap extends CommandBase {
                 sender.sendMessage(new TextComponentTranslation("cmd.map.desc.4"));
                 return;
             }
+        } else if (args.length == 1 && args[0].equalsIgnoreCase("reload_colors")) {
+            sender.sendMessage(new TextComponentTranslation("cmd.map.reload_colors_start"));
+            BlockColorConfig.init(new File("MapData", "colors.cfg"), false);
+            sender.sendMessage(new TextComponentTranslation("cmd.map.regen_colors_end"));
+            return;
         }
         throw new WrongUsageException(this.getUsage(sender));
     }
@@ -97,10 +103,7 @@ public class CommandGtwMap extends CommandBase {
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, BlockPos
             targetPos) {
         if (args.length == 1) {
-            ArrayList l = new ArrayList();
-            l.add("edit");
-            l.add("loadmap");
-            return getListOfStringsMatchingLastWord(args, l);
+            return getListOfStringsMatchingLastWord(args, Arrays.asList("edit", "loadmap", "reload_colors"));
         } else if (args.length == 2 && (args[0].equalsIgnoreCase("loadmap") || args[0].equalsIgnoreCase("spn"))) {
             return getListOfStringsMatchingLastWord(args, Arrays.asList("preload", "full", "region"));
         }
