@@ -83,9 +83,7 @@ public class BBMessageGpsNodes implements ISerializablePacket {
                         if (ClientEventHandler.MC.currentScreen instanceof GuiFrame.APIGuiScreen && ((GuiFrame.APIGuiScreen) ClientEventHandler.MC.currentScreen).getFrame() instanceof GuiBigMap) {
                             ((GuiBigMap) ((GuiFrame.APIGuiScreen) ClientEventHandler.MC.currentScreen).getFrame()).refreshGpsNodeComponents();
                         }
-                        if(ACsGuiApi.getDisplayHudGui() != null && ACsGuiApi.getDisplayHudGui().getFrame() instanceof GuiMinimap) {
-                            ((GuiMinimap) ACsGuiApi.getDisplayHudGui().getFrame()).refreshGpsNodeComponents();
-                        }
+                        ACsGuiApi.getDisplayHudGuis().stream().filter(hud -> hud.getFrame() instanceof GuiMinimap).findFirst().ifPresent(hud -> ((GuiMinimap) hud.getFrame()).refreshGpsNodeComponents());
                         break;
                     case REMOVE:
                         message.ids.forEach(id -> {

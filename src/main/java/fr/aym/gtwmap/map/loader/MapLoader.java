@@ -114,7 +114,7 @@ public class MapLoader {
 
     public MapPart loadPartFromFile(World world, PartPos pos) throws IOException {
         if (godMode.get().isReloadingAll()) {
-            GtwMapMod.log.info("Loading {} from file: ignoring because loading mode is reloading all.", pos);
+            GtwMapMod.log.debug("Loading {} from file: ignoring because loading mode is reloading all.", pos);
             MapPart part = new MapPartServer(world, pos, GtwMapConstants.TILE_SIZE, GtwMapConstants.TILE_SIZE);
             part.fillWithColor(Color.LIGHT_GRAY.getRGB());
             part.setDirty(true, null);
@@ -122,7 +122,7 @@ public class MapLoader {
             return part;
         }
         File mapFile = new File(storage, "map_part_" + pos.xOrig + "_" + pos.zOrig + ".mapdata");
-        GtwMapMod.log.info("Loading {} from file : {}", pos, mapFile.exists());
+        //GtwMapMod.log.info("Loading {} from file : {}", pos, mapFile.exists());
         if (mapFile.exists()) {
             Scanner sc = new Scanner(mapFile, "UTF-8");
             int version = -1, width = -1, height = -1;
@@ -141,6 +141,10 @@ public class MapLoader {
                 data = part.getMapTextureData();
                 line = sc.nextLine();
                 sp = line.split(";");
+                if(sp.length < data.length)
+                {
+                    throw new ArrayIndexOutOfBoundsException("Mismatched data length: " + sp.length + " vs " + data.length + " in " + mapFile);
+                }
                 for (int i = 0; i < data.length; i++) {
                     id = i;
                     int val = Integer.parseInt(sp[i]);
@@ -157,7 +161,7 @@ public class MapLoader {
                 width = GtwMapConstants.TILE_SIZE;
                 height = GtwMapConstants.TILE_SIZE;
                 part = new MapPartServer(world, pos, width, height);
-                part.fillWithColor(Color.RED.getRGB());
+                part.fillWithColor(Color.LIGHT_GRAY.getRGB());
                 gray = true;
             }
             sc.close();

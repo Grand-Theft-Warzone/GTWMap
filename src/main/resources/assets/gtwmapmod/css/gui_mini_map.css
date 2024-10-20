@@ -21,20 +21,21 @@
     height: 100%;
 }
 
-.waypoint {
+.waypoint, .waypoint_small {
     padding-left: 1px;
     padding-top: 1px;
-
     left: auto;
     top: auto;
     width: 10px;
     height: 10px;
-
     color: auto;
-
     z-index: 20;
-
     background-image: auto;
+}
+
+.waypoint_small {
+    width: 6px;
+    height: 6px;
 }
 
 #custom_marker {

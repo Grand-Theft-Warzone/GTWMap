@@ -108,7 +108,9 @@ public class GuiBigMap extends GuiFrame {
             @Override
             public void onMouseMoved(int mouseX, int mouseY) {
                 if (mouseClickX != 0 && (mouseX != mouseClickX || mouseY != mouseClickY)) {
-                    updateViewport(new GuiMinimap.Viewport(viewport.x - (mouseX - mouseClickX), viewport.y - (mouseY - mouseClickY), viewport.width, viewport.height));
+                    float zoomX = viewport.width / 400;
+                    float zoomY = viewport.height / 400;
+                    updateViewport(new GuiMinimap.Viewport(viewport.x - (mouseX - mouseClickX) * zoomX, viewport.y - (mouseY - mouseClickY) * zoomY, viewport.width, viewport.height));
                     mouseClickX = mouseX;
                     mouseClickY = mouseY;
                 }
@@ -535,14 +537,14 @@ public class GuiBigMap extends GuiFrame {
                 }
             }
         };
-        mapPane.add(label.setHoveringText(Collections.singletonList(object.getDisplayName())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
+        mapPane.add(label.setHoveringText(Collections.singletonList(object.getDisplayName())).setCssId("custom_marker").setCssClass(object.smallIcon() ? "waypoint_small" : "waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
         tackedObjectsPosCache.put(object, new EntityPosCache(object, label, pos));
     }
 
     private int countx, county;
 
     @Override
-    public void drawForeground(int mouseX, int mouseY, float partialTicks) {
+    public void drawForeground(int mouseX, int mouseY, float partialTicks, boolean enableScissor) {
         // Draw links between nodes
         GlStateManager.disableTexture2D();
         GuiAPIClientHelper.glScissor(mapPane.getScreenX(), mapPane.getScreenY(), mapPane.getWidth(), mapPane.getHeight());
@@ -778,7 +780,7 @@ public class GuiBigMap extends GuiFrame {
         bindLayerBounds();
         GlStateManager.enableTexture2D();
 
-        super.drawForeground(mouseX, mouseY, partialTicks);
+        super.drawForeground(mouseX, mouseY, partialTicks, enableScissor);
         int x = (int) (viewport.x + (mouseX - mapPane.getRenderMinX()) * viewport.width / (mapPane.getWidth() == 0 ? 1 : mapPane.getWidth()));
         int z = (int) (viewport.y + (mouseY - mapPane.getRenderMinY()) * viewport.height / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight()));
         mc.fontRenderer.drawString("x= " + x + " z=" + z, mouseX + 10, mouseY + 10, Color.WHITE.getRGB());
@@ -815,7 +817,7 @@ public class GuiBigMap extends GuiFrame {
     @Override
     public void guiClose() {
         super.guiClose();
-        if (ACsGuiApi.getDisplayHudGui() == null || !(ACsGuiApi.getDisplayHudGui().getFrame() instanceof GuiMinimap)) {
+        if (ACsGuiApi.getDisplayHudGuis().stream().noneMatch(gui -> gui.getFrame() instanceof GuiBigMap)) {
             GtwMapMod.getNetwork().sendToServer(new S19PacketMapPartQuery(Integer.MIN_VALUE, Integer.MAX_VALUE));
             ((MapContainerClient) MapContainer.getInstance(true)).dirtyAll();
         }

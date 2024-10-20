@@ -34,9 +34,7 @@ public class ClientEventHandler {
                 ACsGuiApi.asyncLoadThenShowGui("client_map", () -> new GuiBigMap(false));
             }
             if (Config.debug && Keyboard.isKeyDown(Keyboard.KEY_P)) {
-                if (ACsGuiApi.getDisplayHudGui() != null) {
-                    ACsGuiApi.closeHudGui();
-                } else {
+                if (!ACsGuiApi.closeHudGui(GuiMinimap.class)) {
                     ACsGuiApi.asyncLoadThenShowHudGui("minimap", GuiMinimap::new);
                 }
             }

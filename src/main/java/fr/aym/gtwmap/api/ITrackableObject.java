@@ -14,6 +14,10 @@ public interface ITrackableObject<T> {
 
     String getIcon();
 
+    default boolean smallIcon() {
+        return true;
+    }
+
     default int renderPoliceCircleAroundRadius() {
         return 0;
     }

@@ -68,6 +68,8 @@ public abstract class MapPart {
                     state = State.LOADING;
                 } catch (Exception e) {
                     GtwMapMod.log.fatal("Error loading map part {}", this, e);
+                    System.out.println("Error loading map part " + this);
+                    e.printStackTrace();
                     state = State.ERRORED;
                     fillWithColor(Color.RED.getRGB());
                 }

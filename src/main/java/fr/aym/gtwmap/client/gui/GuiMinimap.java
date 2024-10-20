@@ -10,6 +10,7 @@ import fr.aym.acsguis.component.style.ComponentStyleManager;
 import fr.aym.acsguis.component.textarea.GuiLabel;
 import fr.aym.acsguis.cssengine.selectors.EnumSelectorContext;
 import fr.aym.acsguis.cssengine.style.EnumCssStyleProperty;
+import fr.aym.acsguis.utils.CircleBackground;
 import fr.aym.acsguis.utils.GuiTextureSprite;
 import fr.aym.acsguis.utils.IGuiTexture;
 import fr.aym.gtwmap.GtwMapMod;
@@ -427,20 +428,20 @@ public class GuiMinimap extends GuiFrame {
                 }
             }
         };
-        mapPane.add(label.setHoveringText(Collections.singletonList(object.getDisplayName())).setCssId("custom_marker").setCssClass("waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
+        mapPane.add(label.setHoveringText(Collections.singletonList(object.getDisplayName())).setCssId("custom_marker").setCssClass(object.smallIcon() ? "waypoint_small" : "waypoint").getStyle().addAutoStyleHandler(pos).getOwner());
         tackedObjectsPosCache.put(object, new EntityPosCache(object, label, pos));
     }
 
     @Override
-    public void drawBackground(int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(int mouseX, int mouseY, float partialTicks, boolean enableScissor) {
         float pX = (float) mc.player.prevPosX + (float) (mc.player.posX - mc.player.prevPosX) * partialTicks;
         float pZ = (float) mc.player.prevPosZ + (float) (mc.player.posZ - mc.player.prevPosZ) * partialTicks;
         updateViewport(new Viewport(pX - mapSize / 2, pZ - mapSize / 2, mapSize, mapSize), partialTicks, partialTicks >= 0.95f);
-        super.drawBackground(mouseX, mouseY, partialTicks);
+        super.drawBackground(mouseX, mouseY, partialTicks, enableScissor);
     }
 
     @Override
-    public void drawForeground(int mouseX, int mouseY, float partialTicks) {
+    public void drawForeground(int mouseX, int mouseY, float partialTicks, boolean enableScissor) {
         GlStateManager.disableTexture2D();
         GL11.glEnable(GL_SCISSOR_TEST);
         GuiAPIClientHelper.glScissor(mapPane.getScreenX(), mapPane.getScreenY(), mapPane.getWidth(), mapPane.getHeight());
@@ -563,7 +564,7 @@ public class GuiMinimap extends GuiFrame {
         GL11.glDisable(GL_SCISSOR_TEST);
         GlStateManager.enableTexture2D();
 
-        super.drawForeground(mouseX, mouseY, partialTicks);
+        super.drawForeground(mouseX, mouseY, partialTicks, enableScissor);
     }
 
     @Override
@@ -652,7 +653,7 @@ public class GuiMinimap extends GuiFrame {
         glStencilMask(0x00);
         // draw where stencil's value is 0
         glStencilFunc(GL_EQUAL, 0, 0xFF);
-        /* (nothing to draw) */
+        CircleBackground.drawDisk(cx, cy, radius + 3, 0xff444444, 0, 0, (float) (Math.PI * 2));
         // draw only where stencil's value is 1
         glStencilFunc(GL_EQUAL, 1, 0xFF);
         int i = GlStateManager.glGetError();

@@ -52,9 +52,7 @@ public class GpsNavigator {
         if (ClientEventHandler.MC.currentScreen instanceof GuiFrame.APIGuiScreen && ((GuiFrame.APIGuiScreen) ClientEventHandler.MC.currentScreen).getFrame() instanceof GuiBigMap) {
             ((GuiBigMap) ((GuiFrame.APIGuiScreen) ClientEventHandler.MC.currentScreen).getFrame()).refreshCustomMarker();
         }
-        if (ACsGuiApi.getDisplayHudGui() != null && ACsGuiApi.getDisplayHudGui().getFrame() instanceof GuiMinimap) {
-            ((GuiMinimap) ACsGuiApi.getDisplayHudGui().getFrame()).refreshCustomMarker();
-        }
+        ACsGuiApi.getDisplayHudGuis().stream().filter(hud -> hud.getFrame() instanceof GuiMinimap).findFirst().ifPresent(hud -> ((GuiMinimap) hud.getFrame()).refreshCustomMarker());
     }
 
     public void setTargetNode(EntityPlayer player, GpsNode node) {

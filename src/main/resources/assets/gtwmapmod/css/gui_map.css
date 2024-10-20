@@ -22,22 +22,21 @@
     height: 100%;
 }
 
-.waypoint {
-    padding: 0px;
-
-    text-align: center;
-    text-align-vertical: center;
-
+.waypoint, .waypoint_small {
+    padding-left: 1px;
+    padding-top: 1px;
     left: auto;
     top: auto;
     width: 16px;
     height: 16px;
-
     color: auto;
-
     z-index: 20;
-
     background-image: auto;
+}
+
+.waypoint_small {
+    width: 10px;
+    height: 10px;
 }
 
 #custom_marker {

@@ -49,7 +49,7 @@ public class AsyncMapPartSaver implements Runnable {
                 }
             }
             if(!mapLoader.getSaveQueue().isEmpty()) {
-                GtwMapMod.log.info("Saving remaining map parts...");
+                GtwMapMod.log.debug("Saving remaining map parts...");
                 save();
             }
         } catch (Exception e) {
@@ -73,7 +73,7 @@ public class AsyncMapPartSaver implements Runnable {
                 wri.write("" + part.getMapTextureData()[part.getMapTextureData().length - 1]);
                 wri.flush();
                 wri.close();
-                GtwMapMod.log.info("Saved map part {}", part.getPos());
+                //GtwMapMod.log.info("Saved map part {}", part.getPos());
             }
         } catch (IOException e) {
             GtwMapMod.log.error("Error saving map parts", e);
