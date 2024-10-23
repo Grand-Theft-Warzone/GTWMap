@@ -4,11 +4,11 @@ import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.loader.EnumLoadMode;
 import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.network.CS18PacketMapPart;
+import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.Getter;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
 
@@ -41,6 +41,7 @@ public class MapContainerServer extends MapContainer {
                     if (part != null) {
                         tiles.put(entry.getKey(), part);
                         entry.getValue().complete(part);
+                        loadQueue.remove(entry.getKey());
                         continue;
                     }
                 } catch (IOException e) {
@@ -176,5 +177,16 @@ public class MapContainerServer extends MapContainer {
             list.addAll(requests.get(t));
             //  System.out.println("Pending updates are now " + pendingUpdates);
         }
+    }
+
+    public void preloadFullMap() {
+        int count = 0;
+        for (int x = Config.mapDims[0] - (GtwMapConstants.TILE_SIZE - 1); x <= Config.mapDims[1] + (GtwMapConstants.TILE_SIZE - 1); x += GtwMapConstants.TILE_SIZE) {
+            for (int z = Config.mapDims[2] - (GtwMapConstants.TILE_SIZE - 1); z <= Config.mapDims[3] + (GtwMapConstants.TILE_SIZE - 1); z += GtwMapConstants.TILE_SIZE) {
+                requestTileLoading(x, z, null);
+                count++;
+            }
+        }
+        GtwMapMod.log.info("Preloading {} map parts...", count);
     }
 }

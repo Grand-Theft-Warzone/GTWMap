@@ -79,6 +79,9 @@ public class MapLoader {
         instance = this;
         pool.allowCoreThreadTimeOut(true);
         pool.submit(new AsyncMapPartSaver(mapContainerServer, this));
+
+        GtwMapMod.log.info("World loaded, starting map loading");
+        mapContainerServer.preloadFullMap();
     }
 
     public void loadArea(int xmin, int xmax, int zmin, int zmax, EnumLoadMode mode, boolean force, ICommandSender sender) {
@@ -141,8 +144,7 @@ public class MapLoader {
                 data = part.getMapTextureData();
                 line = sc.nextLine();
                 sp = line.split(";");
-                if(sp.length < data.length)
-                {
+                if (sp.length < data.length) {
                     throw new ArrayIndexOutOfBoundsException("Mismatched data length: " + sp.length + " vs " + data.length + " in " + mapFile);
                 }
                 for (int i = 0; i < data.length; i++) {

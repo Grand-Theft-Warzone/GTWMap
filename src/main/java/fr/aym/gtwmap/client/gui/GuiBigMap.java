@@ -257,7 +257,6 @@ public class GuiBigMap extends GuiFrame {
     }
 
     private void handleNodeRightClick(GpsNode node) {
-        System.out.println("NODE RG");
         switch (editMode) {
             case VIEW:
             case VIEW_NODES:
