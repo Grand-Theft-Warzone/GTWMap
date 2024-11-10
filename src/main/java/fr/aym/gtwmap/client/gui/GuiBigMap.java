@@ -14,6 +14,7 @@ import fr.aym.acsguis.cssengine.selectors.EnumSelectorContext;
 import fr.aym.acsguis.cssengine.style.EnumCssStyleProperty;
 import fr.aym.acsguis.event.listeners.mouse.IMouseExtraClickListener;
 import fr.aym.acsguis.event.listeners.mouse.IMouseMoveListener;
+import fr.aym.acsguis.utils.ComponentRenderContext;
 import fr.aym.acsguis.utils.GuiTextureSprite;
 import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.api.GtwMapApi;
@@ -543,7 +544,7 @@ public class GuiBigMap extends GuiFrame {
     private int countx, county;
 
     @Override
-    public void drawForeground(int mouseX, int mouseY, float partialTicks, boolean enableScissor) {
+    public void drawForeground(int mouseX, int mouseY, float partialTicks, ComponentRenderContext renderContext) {
         // Draw links between nodes
         GlStateManager.disableTexture2D();
         GuiAPIClientHelper.glScissor(mapPane.getScreenX(), mapPane.getScreenY(), mapPane.getWidth(), mapPane.getHeight());
@@ -779,7 +780,7 @@ public class GuiBigMap extends GuiFrame {
         bindLayerBounds();
         GlStateManager.enableTexture2D();
 
-        super.drawForeground(mouseX, mouseY, partialTicks, enableScissor);
+        super.drawForeground(mouseX, mouseY, partialTicks, renderContext);
         int x = (int) (viewport.x + (mouseX - mapPane.getRenderMinX()) * viewport.width / (mapPane.getWidth() == 0 ? 1 : mapPane.getWidth()));
         int z = (int) (viewport.y + (mouseY - mapPane.getRenderMinY()) * viewport.height / (mapPane.getHeight() == 0 ? 1 : mapPane.getHeight()));
         mc.fontRenderer.drawString("x= " + x + " z=" + z, mouseX + 10, mouseY + 10, Color.WHITE.getRGB());

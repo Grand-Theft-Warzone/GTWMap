@@ -11,6 +11,7 @@ import fr.aym.acsguis.component.textarea.GuiLabel;
 import fr.aym.acsguis.cssengine.selectors.EnumSelectorContext;
 import fr.aym.acsguis.cssengine.style.EnumCssStyleProperty;
 import fr.aym.acsguis.utils.CircleBackground;
+import fr.aym.acsguis.utils.ComponentRenderContext;
 import fr.aym.acsguis.utils.GuiTextureSprite;
 import fr.aym.acsguis.utils.IGuiTexture;
 import fr.aym.gtwmap.GtwMapMod;
@@ -137,7 +138,7 @@ public class GuiMinimap extends GuiFrame {
                         GlStateManager.popMatrix();
                     }
                 }.setCssId("gps_node").setCssClass("waypoint");
-                int size = ((WaypointNode) node).getIcon().contains("gun") || ((WaypointNode) node).getIcon().contains("bank") || ((WaypointNode) node).getIcon().contains("car") || ((WaypointNode) node).getIcon().contains("r_arrow") ? 50 : 512;
+                int size = ((WaypointNode) node).getIcon().contains("gun") || ((WaypointNode) node).getIcon().contains("bank") || ((WaypointNode) node).getIcon().contains("car") || ((WaypointNode) node).getIcon().equals("r_arrow") ? 50 : 512;
                 icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + ((WaypointNode) node).getIcon() + ".png"), 0, 0, size, size);
                 WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(node.getPosition().x, node.getPosition().z, icon);
                 label.getStyle().addAutoStyleHandler(position);
@@ -433,15 +434,15 @@ public class GuiMinimap extends GuiFrame {
     }
 
     @Override
-    public void drawBackground(int mouseX, int mouseY, float partialTicks, boolean enableScissor) {
+    public void drawBackground(int mouseX, int mouseY, float partialTicks, ComponentRenderContext renderContext) {
         float pX = (float) mc.player.prevPosX + (float) (mc.player.posX - mc.player.prevPosX) * partialTicks;
         float pZ = (float) mc.player.prevPosZ + (float) (mc.player.posZ - mc.player.prevPosZ) * partialTicks;
         updateViewport(new Viewport(pX - mapSize / 2, pZ - mapSize / 2, mapSize, mapSize), partialTicks, partialTicks >= 0.95f);
-        super.drawBackground(mouseX, mouseY, partialTicks, enableScissor);
+        super.drawBackground(mouseX, mouseY, partialTicks, renderContext);
     }
 
     @Override
-    public void drawForeground(int mouseX, int mouseY, float partialTicks, boolean enableScissor) {
+    public void drawForeground(int mouseX, int mouseY, float partialTicks, ComponentRenderContext renderContext) {
         GlStateManager.disableTexture2D();
         GL11.glEnable(GL_SCISSOR_TEST);
         GuiAPIClientHelper.glScissor(mapPane.getScreenX(), mapPane.getScreenY(), mapPane.getWidth(), mapPane.getHeight());
@@ -564,7 +565,7 @@ public class GuiMinimap extends GuiFrame {
         GL11.glDisable(GL_SCISSOR_TEST);
         GlStateManager.enableTexture2D();
 
-        super.drawForeground(mouseX, mouseY, partialTicks, enableScissor);
+        super.drawForeground(mouseX, mouseY, partialTicks, renderContext);
     }
 
     @Override
