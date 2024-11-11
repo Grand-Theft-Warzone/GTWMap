@@ -60,6 +60,9 @@ public class AsyncMapPartSaver implements Runnable {
 
     private void save() {
         lastSave = System.currentTimeMillis();
+        if(Config.debug) {
+            GtwMapMod.log.info("Saving map parts... " + mapLoader.getSaveQueue().size() + " parts to save");
+        }
         try {
             while (!mapLoader.getSaveQueue().isEmpty()) {
                 MapPart part = mapLoader.getSaveQueue().remove();
@@ -77,6 +80,9 @@ public class AsyncMapPartSaver implements Runnable {
             }
         } catch (IOException e) {
             GtwMapMod.log.error("Error saving map parts", e);
+        }
+        if(Config.debug) {
+            GtwMapMod.log.info("Map parts saved. Took " + (System.currentTimeMillis() - lastSave) + "ms");
         }
     }
 }

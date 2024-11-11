@@ -714,21 +714,23 @@ public class GuiMinimap extends GuiFrame {
 
         @Override
         public boolean handleProperty(EnumCssStyleProperty property, EnumSelectorContext context, ComponentStyleManager csm) {
+            // Not refreshed after component init
+            if (property == EnumCssStyleProperty.TEXTURE && icon != null) {
+                csm.setTexture(icon);
+                return true;
+            }
             if (posX < viewport.x || posX > viewport.x + viewport.width || posZ < viewport.y || posZ > viewport.y + viewport.height) {
                 csm.setVisible(false);
                 return true;
             }
             csm.setVisible(true);
+            // Refreshed after component init
             if (property == EnumCssStyleProperty.LEFT) {
                 csm.getXPos().setAbsolute((posX - GuiMinimap.this.viewport.x) * GuiMinimap.this.mapPane.getWidth() / GuiMinimap.this.viewport.width - 4);
                 return true;
             }
             if (property == EnumCssStyleProperty.TOP) {
                 csm.getYPos().setAbsolute((posZ - GuiMinimap.this.viewport.y) * GuiMinimap.this.mapPane.getHeight() / GuiMinimap.this.viewport.height - 4);
-                return true;
-            }
-            if (property == EnumCssStyleProperty.TEXTURE && icon != null) {
-                csm.setTexture(icon);
                 return true;
             }
             return false;

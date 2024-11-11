@@ -15,11 +15,13 @@ import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 
 import java.awt.*;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.Queue;
-import java.util.Scanner;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -127,14 +129,14 @@ public class MapLoader {
         File mapFile = new File(storage, "map_part_" + pos.xOrig + "_" + pos.zOrig + ".mapdata");
         //GtwMapMod.log.info("Loading {} from file : {}", pos, mapFile.exists());
         if (mapFile.exists()) {
-            Scanner sc = new Scanner(mapFile, "UTF-8");
-            int version = -1, width = -1, height = -1;
-            int[] data;
-            boolean gray = godMode.get().isReloadingAll();
-            int id = -1;
-            MapPart part;
-            try {
-                String line = sc.nextLine();
+            int i = -1;
+            try (BufferedReader reader = new BufferedReader(new FileReader(mapFile))) {
+                int version = -1, width = -1, height = -1;
+                int[] data;
+                boolean gray = godMode.get().isReloadingAll();
+                MapPart part;
+
+                String line = reader.readLine();
                 String[] sp = line.split(";");
                 version = Integer.parseInt(sp[0]);
                 width = Integer.parseInt(sp[1]);
@@ -142,35 +144,35 @@ public class MapLoader {
 
                 part = new MapPartServer(world, pos, width, height);
                 data = part.getMapTextureData();
-                line = sc.nextLine();
-                sp = line.split(";");
-                if (sp.length < data.length) {
-                    throw new ArrayIndexOutOfBoundsException("Mismatched data length: " + sp.length + " vs " + data.length + " in " + mapFile);
+
+                line = reader.readLine();
+                StringTokenizer tokenizer = new StringTokenizer(line, ";");
+                if (tokenizer.countTokens() < data.length) {
+                    throw new ArrayIndexOutOfBoundsException("Mismatched data length: " + tokenizer.countTokens() + " vs " + data.length + " in " + mapFile);
                 }
-                for (int i = 0; i < data.length; i++) {
-                    id = i;
-                    int val = Integer.parseInt(sp[i]);
+
+                for (i = 0; i < data.length; i++) {
+                    int val = Integer.parseInt(tokenizer.nextToken());
                     data[i] = val;
-                    //if(pos.xOrig == 0 && pos.zOrig == 0)
-                    //  System.out.println("Loading " + pos + " " + i + " " + val +" " + Color.CYAN.getRGB() +" //GOD// " + godMode);
                     if (val == Color.LIGHT_GRAY.getRGB() || (godMode.get().isFixingNonLoaded() && (val == Color.RED.getRGB() || val == Color.ORANGE.getRGB() || val == Color.CYAN.getRGB()))) {
                         gray = true;
                     }
                 }
+
+                part.setDirty(gray, null);
+                part.refreshMapContents();
+                return part;
             } catch (Exception e) {
-                System.err.println("Invalid file structure : " + mapFile + " : " + e + " at " + id);
+                System.err.println("Invalid file structure : " + mapFile + " : " + e + " at " + i);
                 e.printStackTrace();
-                width = GtwMapConstants.TILE_SIZE;
-                height = GtwMapConstants.TILE_SIZE;
-                part = new MapPartServer(world, pos, width, height);
+                int width = GtwMapConstants.TILE_SIZE;
+                int height = GtwMapConstants.TILE_SIZE;
+                MapPart part = new MapPartServer(world, pos, width, height);
                 part.fillWithColor(Color.LIGHT_GRAY.getRGB());
-                gray = true;
+                part.setDirty(true, null);
+                part.refreshMapContents();
+                return part;
             }
-            sc.close();
-            // System.out.println("Gray: " + gray + " // " + godMode);
-            part.setDirty(gray, null);
-            part.refreshMapContents();
-            return part;
         } else {
             return null;
         }
@@ -178,14 +180,6 @@ public class MapLoader {
 
     public void load(MapPart part) {
         if (!loadingParts.contains(part)) {
-            // System.out.println("Requesting load " + part + " " + part.getPos());
-            //System.out.println("Loading part "+pos);
-	    	/*if(!part.expired())
-	    	{
-	            for(int i = 0; i < part.getMapTextureData().length; ++i) {
-	            	part.getMapTextureData()[i] = Color.lightGray.getRGB();
-	            }
-	    	}*/
             part.setDirty(false, null);
             part.onContentsChange();
             part.createLoadingTracker();

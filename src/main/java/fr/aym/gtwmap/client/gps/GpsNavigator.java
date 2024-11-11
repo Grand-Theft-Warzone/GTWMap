@@ -17,6 +17,7 @@ import javax.vecmath.Vector3f;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 public class GpsNavigator {
@@ -55,9 +56,9 @@ public class GpsNavigator {
         ACsGuiApi.getDisplayHudGuis().stream().filter(hud -> hud.getFrame() instanceof GuiMinimap).findFirst().ifPresent(hud -> ((GuiMinimap) hud.getFrame()).refreshCustomMarker());
     }
 
-    public void setTargetNode(EntityPlayer player, GpsNode node) {
+    public void setTargetNode(EntityPlayer player, GpsNode targetNode) {
         clear();
-        if ((customWaypoint != null ? customWaypoint : node).getDistance(player.getPositionVector()) < 5) {
+        if ((customWaypoint != null ? customWaypoint : targetNode).getDistance(player.getPositionVector()) < 5) {
             player.sendMessage(new TextComponentString("Arrived at destination"));
             setCustomWaypoint(null);
             return;
@@ -65,22 +66,25 @@ public class GpsNavigator {
         GpsNodes nodes = GpsNodes.getInstance();
         List<GpsNode> blacklist = new ArrayList<>();
         int attempts = 0;
-        while (currentTarget == null && attempts < 20) {
-            nextNode = nodes.findNearestNode(player.getPositionVector(), blacklist);
-            if (nextNode == null) {
+        GpsNode currentPosNode = null;
+        while (currentTarget == null && attempts < 10) {
+            Set<GpsNode> neighbors = nodes.findNodesInRadius(player.getPositionVector(), blacklist, 100 + attempts * 20);
+            currentPosNode = new GpsNode(new Vector3f((float) player.posX, (float) player.posY, (float) player.posZ), neighbors);
+            if (neighbors.isEmpty() && attempts == 9) {
                 clear();
                 player.sendMessage(new TextComponentString("No start point found"));
                 return;
             }
-            route = nodes.createPathToNode(nextNode, node);
+            route = nodes.createPathToNode(currentPosNode, targetNode);
             if (route == null) {
-                blacklist.add(nextNode);
+                blacklist.addAll(neighbors);
             } else {
-                currentTarget = node;
+                nextNode = route.get(0);
+                currentTarget = targetNode;
             }
             attempts++;
         }
-        if (currentTarget == null || route == null) {
+        if (currentTarget == null || route == null || currentPosNode == null) {
             clear();
             player.sendMessage(new TextComponentString("No path found from here"));
             setCustomWaypoint(null);
@@ -88,15 +92,15 @@ public class GpsNavigator {
         } else if (customWaypoint != null) {
             route.add(customWaypoint);
         }
-        GpsNode firstNode = route.get(0);
-        if (route.size() > 1) {
-            GpsNode secondNode = route.get(1);
+        if (route.size() > 2) {
+            GpsNode firstNode = route.get(1);
+            GpsNode secondNode = route.get(2);
             if (secondNode.getDistance(player.getPositionVector()) < secondNode.getDistance(firstNode)) {
-                route.remove(0);
+                route.remove(1);
             }
         }
-        GpsNode playerPos = new GpsNode(new Vector3f((float) player.posX, (float) player.posY, (float) player.posZ), null);
-        route.add(0, playerPos);
+        currentPosNode.getNeighbors(null).clear();
+        //route.add(0, currentPosNode);
     }
 
     public void update(EntityPlayer player) {

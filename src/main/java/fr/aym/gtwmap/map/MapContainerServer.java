@@ -4,6 +4,7 @@ import fr.aym.gtwmap.GtwMapMod;
 import fr.aym.gtwmap.map.loader.EnumLoadMode;
 import fr.aym.gtwmap.map.loader.MapLoader;
 import fr.aym.gtwmap.network.CS18PacketMapPart;
+import fr.aym.gtwmap.network.SCMessagePlayerList;
 import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.Getter;
@@ -11,6 +12,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -118,7 +120,7 @@ public class MapContainerServer extends MapContainer {
         return future;
     }
 
-    public void update() {
+    public void update(WorldServer world) {
         for (Entry<PartPos, Set<EntityPlayerMP>> e : pendingUpdates.entrySet()) {
             MapPart part = requestDirect(e.getKey());
             if (part == null) {
@@ -143,11 +145,16 @@ public class MapContainerServer extends MapContainer {
             }
             MapLoader.amountToLoad.set(0);
         }
+        if(world.getTotalWorldTime() % 10 == 0) {
+            SCMessagePlayerList message = new SCMessagePlayerList(world.getMinecraftServer().getPlayerList().getPlayers());
+            for(EntityPlayer player : requestsReversed.keySet()) {
+                GtwMapMod.getNetwork().sendTo(message, (EntityPlayerMP) player);
+            }
+        }
     }
 
     public void removeRequester(EntityPlayer player) {
         //pendingUpdates.remove(player);
-        System.out.println("REQUESTER REMOVE " + player);
         Set<PartPos> pos = requestsReversed.remove(player);
         if (pos != null) {
             for (PartPos p : pos) {
@@ -165,7 +172,6 @@ public class MapContainerServer extends MapContainer {
 
     public void onContentsChange(MapPart part) {
         PartPos t = part.getPos();
-        // System.out.println("Contents change " + t + " " + requests.containsKey(t) + " " + requests);
         if (requests.containsKey(t)) {
             Set<EntityPlayerMP> list;
             if (!pendingUpdates.containsKey(t)) {
@@ -175,7 +181,6 @@ public class MapContainerServer extends MapContainer {
                 list = pendingUpdates.get(t);
             }
             list.addAll(requests.get(t));
-            //  System.out.println("Pending updates are now " + pendingUpdates);
         }
     }
 

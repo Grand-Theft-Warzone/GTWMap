@@ -2,14 +2,12 @@ package fr.aym.gtwmap.client;
 
 import fr.aym.acsguis.api.ACsGuiApi;
 import fr.aym.gtwmap.api.GtwMapApi;
-import fr.aym.gtwmap.api.ITrackableObject;
 import fr.aym.gtwmap.client.gps.GpsNavigator;
 import fr.aym.gtwmap.client.gui.GuiBigMap;
 import fr.aym.gtwmap.client.gui.GuiMinimap;
 import fr.aym.gtwmap.utils.Config;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.entity.passive.EntityPig;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
@@ -46,9 +44,10 @@ public class ClientEventHandler {
 
     @SubscribeEvent
     public void clientConnected(EntityJoinWorldEvent event) {
-        if (event.getEntity() == MC.player) {
+        if (event.getEntity() == MC.player && !event.getEntity().isDead) {
             gpsNavigator.clear();
             GtwMapApi.getTrackedObjects().clear();
+            ACsGuiApi.closeHudGui(GuiMinimap.class);
             ACsGuiApi.asyncLoadThenShowHudGui("minimap", GuiMinimap::new);
         }
         /*if (event.getEntity() instanceof EntityPig && event.getEntity().world.isRemote) {
@@ -64,7 +63,7 @@ public class ClientEventHandler {
 
     @SubscribeEvent
     public void clientTickEvent(TickEvent.ClientTickEvent event) {
-        if(MC.player != null) {
+        if (MC.player != null) {
             gpsNavigator.update(MC.player);
         }
     }

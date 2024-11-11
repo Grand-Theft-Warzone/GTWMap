@@ -1,5 +1,6 @@
 package fr.aym.gtwmap.api;
 
+import fr.aym.gtwmap.network.SCMessagePlayerList;
 import lombok.AllArgsConstructor;
 import net.minecraft.entity.Entity;
 
@@ -61,6 +62,53 @@ public interface ITrackableObject<T> {
         @Override
         public boolean equals(Object obj) {
             return obj instanceof ITrackableObject && entity.equals(((ITrackableObject<?>) obj).getTrackedObject());
+        }
+    }
+
+    class TrackedPlayerInformation implements ITrackableObject<SCMessagePlayerList.PlayerInformation> {
+        private SCMessagePlayerList.PlayerInformation playerInformation;
+
+        public TrackedPlayerInformation(SCMessagePlayerList.PlayerInformation playerInformation) {
+            this.playerInformation = playerInformation;
+        }
+
+        @Override
+        public SCMessagePlayerList.PlayerInformation getTrackedObject() {
+            return playerInformation;
+        }
+
+        @Override
+        public float getPosX(float partialTicks) {
+            return playerInformation.getPosX();
+        }
+
+        @Override
+        public float getPosZ(float partialTicks) {
+            return playerInformation.getPosZ();
+        }
+
+        @Override
+        public String getDisplayName() {
+            return playerInformation.getName();
+        }
+
+        @Override
+        public String getIcon() {
+            return "player_white";
+        }
+
+        @Override
+        public int hashCode() {
+            return playerInformation.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof ITrackableObject && playerInformation.equals(((ITrackableObject<?>) obj).getTrackedObject());
+        }
+
+        public void update(SCMessagePlayerList.PlayerInformation playerInformation) {
+            this.playerInformation = playerInformation;
         }
     }
 

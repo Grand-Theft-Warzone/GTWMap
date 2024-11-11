@@ -8,6 +8,7 @@ import fr.aym.gtwmap.network.BBMessageGpsNodes;
 import fr.aym.gtwmap.utils.TaskScheduler;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -32,8 +33,8 @@ public class ServerEventHandler {
 
     @SubscribeEvent
     public void tick(TickEvent.WorldTickEvent event) {
-        if (event.phase == TickEvent.Phase.END && event.world.getTotalWorldTime() % 5 == 0) {
-            ((MapContainerServer) MapContainer.getInstance(false)).update();
+        if (event.phase == TickEvent.Phase.END && !event.world.isRemote && event.world.getTotalWorldTime() % 5 == 0) {
+            ((MapContainerServer) MapContainer.getInstance(false)).update((WorldServer) event.world);
         }
     }
 

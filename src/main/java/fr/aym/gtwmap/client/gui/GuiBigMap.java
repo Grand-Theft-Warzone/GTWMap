@@ -30,6 +30,7 @@ import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapPartClient;
 import fr.aym.gtwmap.map.PartPos;
 import fr.aym.gtwmap.network.S19PacketMapPartQuery;
+import fr.aym.gtwmap.network.SCMessagePlayerList;
 import fr.aym.gtwmap.utils.Config;
 import fr.aym.gtwmap.utils.GtwMapConstants;
 import lombok.AllArgsConstructor;
@@ -50,6 +51,7 @@ import java.awt.*;
 import java.util.List;
 import java.util.Queue;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.lwjgl.opengl.GL11.GL_TRIANGLE_FAN;
 
@@ -66,8 +68,9 @@ public class GuiBigMap extends GuiFrame {
 
     private final GuiPanel mapPane;
     private final Map<PartPos, PartPosAutoStyleHandler> partsStore = new HashMap<>();
-    private final Map<EntityPlayer, ITrackableObject<?>> trackedPlayers = new HashMap<>();
+    private final Map<String, ITrackableObject<?>> trackedPlayers = new HashMap<>();
     private final Map<ITrackableObject<?>, EntityPosCache> tackedObjectsPosCache = new HashMap<>();
+    private int lastObjectsCount;
 
     private GpsNode selectedNode;
     private final BezierCurveLink selectedLink = new BezierCurveLink();
@@ -141,7 +144,6 @@ public class GuiBigMap extends GuiFrame {
             }
         });
         pane.addWheelListener(dWheel -> {
-
             if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
                 selectedNode = null;
                 selectedLink.getControlPoints().clear();
@@ -180,12 +182,13 @@ public class GuiBigMap extends GuiFrame {
         for (EntityPlayer player : mc.world.playerEntities) {
             boolean self = player == mc.player;
             ITrackableObject<?> trackedObject = new ITrackableObject.TrackedEntity(player, self ? I18n.format("gui.map.you") : player.getDisplayNameString(), self ? "r_arrow_white" : "player_white");
-            trackedPlayers.put(player, trackedObject);
+            trackedPlayers.put(player.getName(), trackedObject);
             makeTrackedPoint(trackedObject, self);
         }
         for (ITrackableObject<?> object : GtwMapApi.getTrackedObjects()) {
             makeTrackedPoint(object, false);
         }
+        lastObjectsCount = mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size();
         refreshGpsNodeComponents();
         refreshCustomMarker();
     }
@@ -255,6 +258,50 @@ public class GuiBigMap extends GuiFrame {
         });
         customMarkerComponent = label;
         mapPane.add(label);
+    }
+
+    public void handlePlayerList(List<SCMessagePlayerList.PlayerInformation> playerInformations) {
+        List<String> pInfosStr = playerInformations.stream().map(SCMessagePlayerList.PlayerInformation::getName).collect(Collectors.toList());
+        trackedPlayers.entrySet().removeIf(p -> !pInfosStr.contains(p.getKey()));
+        // todo this is duplicated
+        tackedObjectsPosCache.entrySet().removeIf(p -> {
+            boolean remove = !trackedPlayers.containsValue(p.getKey()) && !GtwMapApi.getTrackedObjects().contains(p.getKey());
+            if (remove) {
+                mapPane.remove(p.getValue().component);
+            }
+            return remove;
+        });
+        for (SCMessagePlayerList.PlayerInformation playerInformation : playerInformations) {
+            if (playerInformation.getName().equals(mc.player.getName())) {
+                continue;
+            }
+            EntityPlayer player = mc.world.getPlayerEntityByName(playerInformation.getName());
+            if (trackedPlayers.containsKey(playerInformation.getName())) {
+                ITrackableObject<?> trackedObject = trackedPlayers.get(playerInformation.getName());
+                if (player == null) {
+                    if (trackedObject instanceof ITrackableObject.TrackedEntity) {
+                        // replace the entity player with the player information
+                        trackedPlayers.remove(playerInformation.getName());
+                        mapPane.remove(tackedObjectsPosCache.remove(trackedObject).component);
+                    } else {
+                        // update the player information
+                        ((ITrackableObject.TrackedPlayerInformation) trackedObject).update(playerInformation);
+                        continue;
+                    }
+                } else {
+                    if (trackedObject instanceof ITrackableObject.TrackedEntity) {
+                        // entity players are always up to date
+                        continue;
+                    }
+                    // replace the player information with the entity player itself
+                    trackedPlayers.remove(playerInformation.getName());
+                    mapPane.remove(tackedObjectsPosCache.remove(trackedObject).component);
+                }
+            }
+            ITrackableObject<?> trackedObject = player != null ? new ITrackableObject.TrackedEntity(player, player.getDisplayNameString(), "player_white") : new ITrackableObject.TrackedPlayerInformation(playerInformation);
+            trackedPlayers.put(playerInformation.getName(), trackedObject);
+            makeTrackedPoint(trackedObject, false);
+        }
     }
 
     private void handleNodeRightClick(GpsNode node) {
@@ -482,8 +529,7 @@ public class GuiBigMap extends GuiFrame {
         oldPoses.stream().map(partsStore::remove).map(PartPosAutoStyleHandler::getPartPane).forEach(mapPane::remove);
 
         //====================== Geo localisation ======================
-        if (tackedObjectsPosCache.size() != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size())) {
-            trackedPlayers.entrySet().removeIf(p -> !mc.world.playerEntities.contains(p.getKey()));
+        if (lastObjectsCount != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size())) {
             tackedObjectsPosCache.entrySet().removeIf(p -> {
                 boolean remove = !trackedPlayers.containsValue(p.getKey()) && !GtwMapApi.getTrackedObjects().contains(p.getKey());
                 if (remove) {
@@ -492,9 +538,15 @@ public class GuiBigMap extends GuiFrame {
                 return remove;
             });
             for (EntityPlayer player : mc.world.playerEntities) {
-                if (!trackedPlayers.containsKey(player)) {
+                if (!trackedPlayers.containsKey(player.getName())) {
                     ITrackableObject<?> trackedObject = new ITrackableObject.TrackedEntity(player, player.getDisplayNameString(), "player_white");
-                    trackedPlayers.put(player, trackedObject);
+                    trackedPlayers.put(player.getName(), trackedObject);
+                    makeTrackedPoint(trackedObject, false);
+                } else if (!(trackedPlayers.get(player.getName()) instanceof ITrackableObject.TrackedEntity)) {
+                    // In this case, the player was sent as a PlayerInformation, but now that we have the EntityPlayer, we can update it
+                    mapPane.remove(tackedObjectsPosCache.remove(trackedPlayers.get(player.getName())).component);
+                    ITrackableObject<?> trackedObject = new ITrackableObject.TrackedEntity(player, player.getDisplayNameString(), "player_white");
+                    trackedPlayers.put(player.getName(), trackedObject);
                     makeTrackedPoint(trackedObject, false);
                 }
             }
@@ -503,6 +555,7 @@ public class GuiBigMap extends GuiFrame {
                     makeTrackedPoint(object, false);
                 }
             }
+            lastObjectsCount = mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size();
         }
         for (EntityPosCache posCache : tackedObjectsPosCache.values()) {
             posCache.update();
@@ -833,7 +886,7 @@ public class GuiBigMap extends GuiFrame {
         super.tick();
         boolean update = !viewInitialized;
         if (!update) {
-            update = tackedObjectsPosCache.values().stream().anyMatch(EntityPosCache::hasChanged) || tackedObjectsPosCache.size() != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size());
+            update = tackedObjectsPosCache.values().stream().anyMatch(EntityPosCache::hasChanged) || lastObjectsCount != (mc.world.playerEntities.size() + GtwMapApi.getTrackedObjects().size());
         }
         if (update) {
             viewInitialized = true;

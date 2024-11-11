@@ -18,6 +18,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Mod.EventBusSubscriber(modid = GtwMapConstants.ID)
 public class GpsNodes extends WorldSavedData implements ISerializable {
@@ -75,6 +76,10 @@ public class GpsNodes extends WorldSavedData implements ISerializable {
 
     public GpsNode findNearestNode(Vec3d around, List<GpsNode> avoidNodes) {
         return nodes.values().stream().filter(n -> !avoidNodes.contains(n)).min(Comparator.comparingDouble(gpsNode -> gpsNode.getDistance(around))).orElse(null);
+    }
+
+    public Set<GpsNode> findNodesInRadius(Vec3d around, List<GpsNode> avoidNodes, int radius) {
+        return nodes.values().stream().filter(n -> !avoidNodes.contains(n) && n.getDistance(around) < radius).collect(Collectors.toSet());
     }
 
     public List<GpsNode> createPathToNode(GpsNode startNode, GpsNode end) {

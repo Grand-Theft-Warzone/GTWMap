@@ -11,10 +11,7 @@ import fr.aym.gtwmap.common.CommonProxy;
 import fr.aym.gtwmap.map.MapContainerClient;
 import fr.aym.gtwmap.map.MapContainerServer;
 import fr.aym.gtwmap.map.loader.MapLoader;
-import fr.aym.gtwmap.network.BBMessageGpsNodes;
-import fr.aym.gtwmap.network.CS18PacketMapPart;
-import fr.aym.gtwmap.network.S19PacketMapPartQuery;
-import fr.aym.gtwmap.network.SCMessageEditMap;
+import fr.aym.gtwmap.network.*;
 import fr.aym.gtwmap.server.CommandGtwMap;
 import fr.aym.gtwmap.utils.BlockColorConfig;
 import fr.aym.gtwmap.utils.Config;
@@ -163,6 +160,7 @@ public class GtwMapMod {
         network.registerMessage(BBMessageGpsNodes.HandlerClient.class, BBMessageGpsNodes.class, 191, Side.CLIENT);
         network.registerMessage(BBMessageGpsNodes.HandlerServer.class, BBMessageGpsNodes.class, 192, Side.SERVER);
         network.registerMessage(SCMessageEditMap.Handler.class, SCMessageEditMap.class, 193, Side.CLIENT);
+        network.registerMessage(SCMessagePlayerList.Handler.class, SCMessagePlayerList.class, 194, Side.CLIENT);
     }
 
     @Mod.EventHandler
