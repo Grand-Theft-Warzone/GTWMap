@@ -238,8 +238,8 @@ public class MapLoader {
 
     public void updateChunkLoading() {
         int i = 16;
-        while (!chunkLoaders.isEmpty() && i > 0) {
-            AsyncMapPartLoader.ChunkLoader chunkLoader = chunkLoaders.poll();
+        AsyncMapPartLoader.ChunkLoader chunkLoader;
+        while (i > 0 && (chunkLoader = chunkLoaders.poll()) != null) {
             //long start = System.currentTimeMillis();
             chunkLoader.run();
             // long end = System.currentTimeMillis();
