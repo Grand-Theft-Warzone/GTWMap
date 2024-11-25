@@ -117,7 +117,7 @@ public class GuiMinimap extends GuiFrame {
                     public void drawTexturedBackground(int mouseX, int mouseY, float partialTicks) {
                         //super.drawTexturedBackground(mouseX, mouseY, partialTicks);
 
-                        float scale = (float) (1.23f * (10 / Math.sqrt(mapSize)));
+                        float scale = 1;// (float) (1.23f * (10 / Math.sqrt(mapSize)));
                         IGuiTexture renderTexture = style.getTexture();
                         if (renderTexture != null) {
                             GlStateManager.enableBlend();
@@ -138,7 +138,7 @@ public class GuiMinimap extends GuiFrame {
                         GlStateManager.popMatrix();
                     }
                 }.setCssId("gps_node").setCssClass("waypoint");
-                int size = ((WaypointNode) node).getIcon().contains("gun") || ((WaypointNode) node).getIcon().contains("bank") || ((WaypointNode) node).getIcon().contains("car") || ((WaypointNode) node).getIcon().equals("r_arrow") ? 50 : 512;
+                int size = ((WaypointNode) node).getIconSize();
                 icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + ((WaypointNode) node).getIcon() + ".png"), 0, 0, size, size);
                 WorldPosAutoStyleHandler position = new WorldPosAutoStyleHandler(node.getPosition().x, node.getPosition().z, icon);
                 label.getStyle().addAutoStyleHandler(position);
@@ -181,7 +181,7 @@ public class GuiMinimap extends GuiFrame {
             public void drawTexturedBackground(int mouseX, int mouseY, float partialTicks) {
                 //super.drawTexturedBackground(mouseX, mouseY, partialTicks);
 
-                float scale = (float) (1f * (10 / Math.sqrt(mapSize)));
+                float scale = 1;// (float) (1f * (10 / Math.sqrt(mapSize)));
                 IGuiTexture renderTexture = style.getTexture();
                 if (renderTexture != null) {
                     GlStateManager.enableBlend();
@@ -316,7 +316,7 @@ public class GuiMinimap extends GuiFrame {
     }
 
     public void makeTrackedPoint(ITrackableObject<?> object, boolean rotateLabel) {
-        int size = object.getIcon().contains("gun") || object.getIcon().contains("bank") || object.getIcon().contains("car") || object.getIcon().contains("r_arrow") ? 50 : 512;
+        int size = WaypointNode.getIconSize(object.getIcon());
         GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + object.getIcon() + ".png"), 0, 0, size, size);
         WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler(object.getPosX(1), object.getPosZ(1), icon);
         GuiLabel label = new GuiLabel("") {
@@ -338,12 +338,12 @@ public class GuiMinimap extends GuiFrame {
                 }
                 //super.drawTexturedBackground(mouseX, mouseY, partialTicks);
 
-                float scale = (float) (1.23f * (10 / Math.sqrt(mapSize)));
+                float scale = 1.34f;// (float) (1.23f * (10 / Math.sqrt(mapSize)));
                 IGuiTexture renderTexture = style.getTexture();
                 if (renderTexture != null) {
                     GlStateManager.enableBlend();
                     GlStateManager.pushMatrix();
-                    GlStateManager.translate(getWidth() / 2f, getHeight() / 2f, 0);
+                    GlStateManager.translate(getWidth() / 2f, getHeight() / 2f, 0.5f);
                     GlStateManager.translate(-getWidth() * scale / 2, -getHeight() * scale / 2, 0);
                     renderTexture.drawSprite(getScreenX(), getScreenY(), (int) (getWidth() * scale), (int) (getHeight() * scale));
                     GlStateManager.popMatrix();

@@ -13,6 +13,7 @@ import java.util.UUID;
 public class WaypointNode extends GpsNode {
     private String name;
     private String icon;
+    private int iconSize;
 
     public WaypointNode() {
     }
@@ -21,6 +22,21 @@ public class WaypointNode extends GpsNode {
         super(position, new HashSet<>());
         this.name = name;
         this.icon = icon;
+        updateIconSize();
+    }
+
+    public void setIcon(String icon) {
+        this.icon = icon;
+        updateIconSize();
+    }
+
+    public void updateIconSize() {
+        this.iconSize = getIconSize(icon);
+    }
+
+    public static int getIconSize(String icon) {
+        return icon.contains("gun") || icon.contains("bank") || icon.contains("car") || icon.equals("r_arrow") ? 50 :
+                icon.contains("player_white") || icon.contains("arrow_white") ? 500 : 512;
     }
 
     @Override

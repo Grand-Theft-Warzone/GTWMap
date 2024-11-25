@@ -196,7 +196,7 @@ public class GuiBigMap extends GuiFrame {
     private void addGpsNodeComponent(Map<GpsNode, GuiComponent<?>> gpsNodeComponents, GpsNode node) {
         GuiTextureSprite icon = null;
         if (node instanceof WaypointNode) {
-            int size = ((WaypointNode) node).getIcon().contains("gun") || ((WaypointNode) node).getIcon().contains("bank") || ((WaypointNode) node).getIcon().contains("car") || ((WaypointNode) node).getIcon().contains("r_arrow") ? 50 : 512;
+            int size = ((WaypointNode) node).getIconSize();
             icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + ((WaypointNode) node).getIcon() + ".png"), 0, 0, size, size);
         }
         GuiComponent<?> label = new GuiLabel(icon != null ? "" : "N").setCssId("gps_node").setCssClass("waypoint");
@@ -566,7 +566,7 @@ public class GuiBigMap extends GuiFrame {
     }
 
     public void makeTrackedPoint(ITrackableObject<?> object, boolean rotateLabel) {
-        int size = object.getIcon().contains("gun") || object.getIcon().contains("bank") || object.getIcon().contains("car") || object.getIcon().contains("r_arrow") ? 50 : 512;
+        int size = WaypointNode.getIconSize(object.getIcon());
         GuiTextureSprite icon = new GuiTextureSprite(new ResourceLocation(GtwMapConstants.ID, "textures/gps/wp_" + object.getIcon() + ".png"), 0, 0, size, size);
         WorldPosAutoStyleHandler pos = new WorldPosAutoStyleHandler(object.getPosX(1), object.getPosZ(1), icon);
         GuiLabel label = new GuiLabel("") {
