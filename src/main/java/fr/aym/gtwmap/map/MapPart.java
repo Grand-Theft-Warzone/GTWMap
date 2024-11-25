@@ -81,7 +81,10 @@ public abstract class MapPart {
 
     @SideOnly(Side.CLIENT)
     public void feedWidthBlockData(int[] data) {
-        System.arraycopy(data, 0, mapTextureData, 0, data.length);
+        for(int i = 0; i < data.length; i++) {
+            mapTextureData[i] = -16777216 | data[i];
+        }
+        //System.arraycopy(data, 0, mapTextureData, 0, data.length);
         setDirty(false, null);
         onContentsChange();
     }

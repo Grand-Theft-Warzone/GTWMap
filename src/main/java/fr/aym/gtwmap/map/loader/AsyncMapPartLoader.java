@@ -238,26 +238,23 @@ public class AsyncMapPartLoader implements Runnable {
     static int getMapColorOver(int index, int colorValue) {
         int i = 220;
 
-        if (index == 3) {
-            i = 135;
+        switch (index) {
+            case 0:
+                i = 180;
+                break;
+            case 2:
+                i = 255;
+                break;
+            case 3:
+                i = 135;
+                break;
         }
 
-        if (index == 2) {
-            i = 255;
-        }
-
-        if (index == 1) {
-            i = 220;
-        }
-
-        if (index == 0) {
-            i = 180;
-        }
-
+        int y = (colorValue >> 24 & 255);
         int j = (colorValue >> 16 & 255) * i / 255;
         int k = (colorValue >> 8 & 255) * i / 255;
         int l = (colorValue & 255) * i / 255;
-        return -16777216 | j << 16 | k << 8 | l;
+        return y << 24 | j << 16 | k << 8 | l;
     }
 
     public class ChunkLoader implements Runnable {
